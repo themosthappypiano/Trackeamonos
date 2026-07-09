@@ -568,40 +568,24 @@ textarea {
 }
 
 .task-item {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border-left: 9px solid var(--line);
+  touch-action: pan-y;
+  cursor: grab;
 }
 
 .task-item.ready {
-  border-left-color: #57c5a0;
-  background: linear-gradient(90deg, rgba(87, 197, 160, 0.12), transparent 55%), var(--panel);
+  background: var(--panel);
 }
 
 .task-item.in_progress {
-  border-left-color: var(--blue);
-  background: linear-gradient(90deg, rgba(35, 111, 226, 0.12), transparent 55%), var(--panel);
+  background: var(--panel);
 }
 
 .task-item.done {
-  border-left-color: var(--ink);
-  opacity: 0.78;
-}
-
-.tick {
-  width: 34px;
-  height: 34px;
-  border: 2px solid var(--line);
-  border-radius: 8px;
-  background: white;
-  color: transparent;
-  font-weight: 900;
-}
-
-.tick.done {
-  border-color: var(--line);
-  background: var(--green);
-  color: white;
+  border-color: var(--green);
+  background: linear-gradient(90deg, rgba(24, 168, 109, 0.16), transparent 58%), var(--panel);
+  box-shadow: 5px 5px 0 rgba(24, 168, 109, 0.2);
 }
 
 .item-title {
@@ -617,28 +601,6 @@ textarea {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-}
-
-.reorder-actions {
-  display: flex;
-  gap: 6px;
-  justify-content: flex-end;
-}
-
-.mini-button {
-  width: 34px;
-  height: 34px;
-  border: 2px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--ink);
-  font-weight: 900;
-  box-shadow: 2px 2px 0 rgba(23, 33, 29, 0.12);
-}
-
-.mini-button:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.14);
 }
 
 .status-dot {
@@ -752,8 +714,18 @@ textarea {
 
 .habit-item,
 .check-item {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.task-item.dragging,
+.habit-item.dragging,
+.check-item.dragging {
+  opacity: 0.82;
+  cursor: grabbing;
+  z-index: 2;
 }
 
 .counter {
@@ -889,10 +861,6 @@ textarea {
   }
 
   .task-actions {
-    justify-content: flex-start;
-  }
-
-  .reorder-actions {
     justify-content: flex-start;
   }
 

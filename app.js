@@ -218,6 +218,8 @@ function visibleItemsForKind(kind) {
     .sort(compareItems);
 }
 
+let dragState = null;
+
 function stats(profileId) {
   const tasks = state.tasks.filter((task) => task.profileId === profileId && task.date === today());
   const done = tasks.filter((task) => task.status === "done").length;
@@ -456,15 +458,10 @@ function renderTasks() {
     ` : ""}
     <div class="item-list">
       ${tasks.length ? tasks.map((task) => `
-        <article class="task-item ${task.status}" data-delete-kind="tasks" data-delete-id="${task.id}">
-          <button class="tick ${task.status === "done" ? "done" : ""}" data-task-done="${task.id}" title="Mark done">✓</button>
+        <article class="task-item ${task.status}" data-delete-kind="tasks" data-delete-id="${task.id}" data-drag-kind="tasks" data-drag-id="${task.id}">
           <div class="item-title">
             <strong>${escapeHtml(task.title)}</strong>
             ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
-          </div>
-          <div class="reorder-actions">
-            <button class="mini-button" data-move="tasks:${task.id}:-1" title="Move up">↑</button>
-            <button class="mini-button" data-move="tasks:${task.id}:1" title="Move down">↓</button>
           </div>
           <div class="task-actions">
             <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
@@ -497,15 +494,11 @@ function renderHabits() {
       ${habits.length ? habits.map((habit) => {
         const pct = Math.min(100, Math.round(habit.count / habit.target * 100));
         return `
-          <article class="habit-item" data-delete-kind="habits" data-delete-id="${habit.id}">
+          <article class="habit-item" data-delete-kind="habits" data-delete-id="${habit.id}" data-drag-kind="habits" data-drag-id="${habit.id}">
             <div class="item-title">
               <strong>${escapeHtml(habit.title)}</strong>
               <span>${habit.count}/${habit.target} today</span>
               <div class="habit-meter" style="--meter:${pct}%"><div></div></div>
-            </div>
-            <div class="reorder-actions">
-              <button class="mini-button" data-move="habits:${habit.id}:-1" title="Move up">↑</button>
-              <button class="mini-button" data-move="habits:${habit.id}:1" title="Move down">↓</button>
             </div>
             <div class="counter">
               <button class="icon-button" data-habit-count="${habit.id}:-1">−</button>
@@ -537,14 +530,10 @@ function renderChecklist() {
     ` : ""}
     <div class="item-list">
       ${checks.length ? checks.map((item) => `
-        <article class="check-item" data-delete-kind="checklist" data-delete-id="${item.id}">
+        <article class="check-item" data-delete-kind="checklist" data-delete-id="${item.id}" data-drag-kind="checklist" data-drag-id="${item.id}">
           <div class="item-title">
             <strong>${escapeHtml(item.prompt)}</strong>
             <span>${item.answer === null ? "Not logged yet" : item.answer ? "Confirmed" : "Not today"}</span>
-          </div>
-          <div class="reorder-actions">
-            <button class="mini-button" data-move="checklist:${item.id}:-1" title="Move up">↑</button>
-            <button class="mini-button" data-move="checklist:${item.id}:1" title="Move down">↓</button>
           </div>
           <div class="check-row">
             <button class="${item.answer === true ? "active yes" : ""}" data-check="${item.id}:true">Yes</button>
@@ -637,11 +626,8 @@ function bindEvents() {
     node.addEventListener("dblclick", deleteFromCard);
   });
 
-  document.querySelectorAll("[data-move]").forEach((node) => {
-    node.addEventListener("click", () => {
-      const [kind, id, delta] = node.dataset.move.split(":");
-      moveItem(kind, id, Number(delta));
-    });
+  document.querySelectorAll("[data-drag-kind]").forEach((node) => {
+    node.addEventListener("pointerdown", startDrag);
   });
 
   document.querySelectorAll("[data-task-status]").forEach((node) => {
@@ -654,17 +640,6 @@ function bindEvents() {
       render();
       persistTaskStatus(id, nextStatus);
       notify(nextStatus === "done" ? "Task done. XP locked in." : "Task updated.");
-    });
-  });
-
-  document.querySelectorAll("[data-task-done]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.tasks = state.tasks.map((task) => task.id === node.dataset.taskDone ? { ...task, status: task.status === "done" ? "ready" : "done" } : task);
-      const updated = state.tasks.find((task) => task.id === node.dataset.taskDone);
-      saveState();
-      render();
-      if (updated) persistTaskStatus(updated.id, updated.status);
-      notify("Task updated.");
     });
   });
 
@@ -923,6 +898,45 @@ async function deleteItem(kind, id) {
     console.error(error);
     notify("Supabase delete failed.");
   }
+}
+
+function startDrag(event) {
+  if (event.target.closest("button, input, textarea, label")) return;
+  const node = event.currentTarget;
+  dragState = {
+    kind: node.dataset.dragKind,
+    id: node.dataset.dragId,
+    startY: event.clientY,
+    moved: false
+  };
+  node.classList.add("dragging");
+  node.setPointerCapture(event.pointerId);
+  node.addEventListener("pointermove", dragMove);
+  node.addEventListener("pointerup", endDrag);
+  node.addEventListener("pointercancel", endDrag);
+}
+
+function dragMove(event) {
+  if (!dragState) return;
+  const distance = event.clientY - dragState.startY;
+  event.currentTarget.style.transform = `translateY(${Math.max(-80, Math.min(80, distance))}px)`;
+  dragState.moved = Math.abs(distance) > 24;
+}
+
+function endDrag(event) {
+  const node = event.currentTarget;
+  node.classList.remove("dragging");
+  node.style.transform = "";
+  node.removeEventListener("pointermove", dragMove);
+  node.removeEventListener("pointerup", endDrag);
+  node.removeEventListener("pointercancel", endDrag);
+
+  if (!dragState) return;
+  const distance = event.clientY - dragState.startY;
+  const direction = Math.abs(distance) < 24 ? 0 : Math.sign(distance);
+  const { kind, id, moved } = dragState;
+  dragState = null;
+  if (moved && direction) moveItem(kind, id, direction);
 }
 
 function moveItem(kind, id, delta) {
