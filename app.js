@@ -96,7 +96,8 @@ function mapTask(row) {
     profileId: row.profile_id,
     title: row.title,
     date: row.task_date,
-    status: row.status
+    status: row.status,
+    createdAt: row.created_at
   };
 }
 
@@ -107,7 +108,8 @@ function mapHabit(row, logs) {
     profileId: row.profile_id,
     title: row.title,
     target: row.target_count,
-    count: log?.count || 0
+    count: log?.count || 0,
+    createdAt: row.created_at
   };
 }
 
@@ -117,7 +119,8 @@ function mapChecklistItem(row, logs) {
     id: row.id,
     profileId: row.profile_id,
     prompt: row.prompt,
-    answer: log ? log.answer : null
+    answer: log ? log.answer : null,
+    createdAt: row.created_at
   };
 }
 
@@ -185,6 +188,36 @@ function statusLabel(status) {
   }[status] || "Ready";
 }
 
+function compareItems(a, b) {
+  return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+}
+
+function tableForKind(kind) {
+  return {
+    tasks: "tasks",
+    habits: "habits",
+    checklist: "checklist_items"
+  }[kind];
+}
+
+function collectionForKind(kind) {
+  return {
+    tasks: "tasks",
+    habits: "habits",
+    checklist: "checklist"
+  }[kind];
+}
+
+function visibleItemsForKind(kind) {
+  const profile = activeProfile();
+  if (!profile) return [];
+  const collection = state[collectionForKind(kind)] || [];
+  return collection
+    .filter((item) => item.profileId === profile.id)
+    .filter((item) => kind !== "tasks" || item.date === today())
+    .sort(compareItems);
+}
+
 function stats(profileId) {
   const tasks = state.tasks.filter((task) => task.profileId === profileId && task.date === today());
   const done = tasks.filter((task) => task.status === "done").length;
@@ -223,7 +256,7 @@ async function hydrateFromSupabase() {
     }
     const idFilter = `(${profileIds.join(",")})`;
     const [tasks, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
-      supabaseRequest("tasks", { query: `?select=*&profile_id=in.${idFilter}&order=task_date.asc` }),
+      supabaseRequest("tasks", { query: `?select=*&profile_id=in.${idFilter}&order=task_date.asc,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=*&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
       supabaseRequest("habit_logs", { query: `?select=*&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
       supabaseRequest("checklist_items", { query: `?select=*&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
@@ -404,13 +437,13 @@ function closeOpenForms() {
 
 function renderTasks() {
   const tasks = byProfile(state.tasks)
-    .filter((task) => task.date <= today())
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .filter((task) => task.date === today())
+    .sort(compareItems);
   return `
     <div class="section-head">
       <div>
         <h3>Tasks</h3>
-        <span>Due tasks appear here when their day arrives.</span>
+        <span>Only today's tasks show here. Tomorrow starts clean.</span>
       </div>
       <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
     </div>
@@ -423,24 +456,28 @@ function renderTasks() {
     ` : ""}
     <div class="item-list">
       ${tasks.length ? tasks.map((task) => `
-        <article class="task-item ${task.status}">
+        <article class="task-item ${task.status}" data-delete-kind="tasks" data-delete-id="${task.id}">
           <button class="tick ${task.status === "done" ? "done" : ""}" data-task-done="${task.id}" title="Mark done">✓</button>
           <div class="item-title">
             <strong>${escapeHtml(task.title)}</strong>
             ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
+          </div>
+          <div class="reorder-actions">
+            <button class="mini-button" data-move="tasks:${task.id}:-1" title="Move up">↑</button>
+            <button class="mini-button" data-move="tasks:${task.id}:1" title="Move down">↓</button>
           </div>
           <div class="task-actions">
             <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
             <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
           </div>
         </article>
-      `).join("") : `<div class="empty">No tasks due today. Future tasks will show here on their date.</div>`}
+      `).join("") : `<div class="empty">No tasks for today. Future tasks will show on their date.</div>`}
     </div>
   `;
 }
 
 function renderHabits() {
-  const habits = byProfile(state.habits);
+  const habits = byProfile(state.habits).sort(compareItems);
   return `
     <div class="section-head">
       <div>
@@ -460,11 +497,15 @@ function renderHabits() {
       ${habits.length ? habits.map((habit) => {
         const pct = Math.min(100, Math.round(habit.count / habit.target * 100));
         return `
-          <article class="habit-item">
+          <article class="habit-item" data-delete-kind="habits" data-delete-id="${habit.id}">
             <div class="item-title">
               <strong>${escapeHtml(habit.title)}</strong>
               <span>${habit.count}/${habit.target} today</span>
               <div class="habit-meter" style="--meter:${pct}%"><div></div></div>
+            </div>
+            <div class="reorder-actions">
+              <button class="mini-button" data-move="habits:${habit.id}:-1" title="Move up">↑</button>
+              <button class="mini-button" data-move="habits:${habit.id}:1" title="Move down">↓</button>
             </div>
             <div class="counter">
               <button class="icon-button" data-habit-count="${habit.id}:-1">−</button>
@@ -479,7 +520,7 @@ function renderHabits() {
 }
 
 function renderChecklist() {
-  const checks = byProfile(state.checklist);
+  const checks = byProfile(state.checklist).sort(compareItems);
   return `
     <div class="section-head">
       <div>
@@ -496,10 +537,14 @@ function renderChecklist() {
     ` : ""}
     <div class="item-list">
       ${checks.length ? checks.map((item) => `
-        <article class="check-item">
+        <article class="check-item" data-delete-kind="checklist" data-delete-id="${item.id}">
           <div class="item-title">
             <strong>${escapeHtml(item.prompt)}</strong>
             <span>${item.answer === null ? "Not logged yet" : item.answer ? "Confirmed" : "Not today"}</span>
+          </div>
+          <div class="reorder-actions">
+            <button class="mini-button" data-move="checklist:${item.id}:-1" title="Move up">↑</button>
+            <button class="mini-button" data-move="checklist:${item.id}:1" title="Move down">↓</button>
           </div>
           <div class="check-row">
             <button class="${item.answer === true ? "active yes" : ""}" data-check="${item.id}:true">Yes</button>
@@ -580,6 +625,23 @@ function bindEvents() {
 
   document.querySelectorAll("[data-tab]").forEach((node) => {
     node.addEventListener("click", () => setState({ activeTab: node.dataset.tab, ...closeOpenForms() }));
+  });
+
+  document.querySelectorAll("[data-delete-kind]").forEach((node) => {
+    const deleteFromCard = (event) => {
+      if (event.target.closest("button, input, textarea, label")) return;
+      event.preventDefault();
+      deleteItem(node.dataset.deleteKind, node.dataset.deleteId);
+    };
+    node.addEventListener("contextmenu", deleteFromCard);
+    node.addEventListener("dblclick", deleteFromCard);
+  });
+
+  document.querySelectorAll("[data-move]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const [kind, id, delta] = node.dataset.move.split(":");
+      moveItem(kind, id, Number(delta));
+    });
   });
 
   document.querySelectorAll("[data-task-status]").forEach((node) => {
@@ -668,7 +730,7 @@ async function addTask(event) {
   const date = document.querySelector("#task-date").value || today();
   if (!title) return;
   const profile = activeProfile();
-  let task = { id: uid("task"), profileId: profile.id, title, date, status: "ready" };
+  let task = { id: uid("task"), profileId: profile.id, title, date, status: "ready", createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("tasks", {
@@ -699,7 +761,7 @@ async function addHabit(event) {
   const target = Math.max(1, Number(document.querySelector("#habit-target").value) || 1);
   if (!title) return;
   const profile = activeProfile();
-  let habit = { id: uid("habit"), profileId: profile.id, title, target, count: 0 };
+  let habit = { id: uid("habit"), profileId: profile.id, title, target, count: 0, createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("habits", {
@@ -728,7 +790,7 @@ async function addChecklist(event) {
   const prompt = document.querySelector("#check-prompt").value.trim();
   if (!prompt) return;
   const profile = activeProfile();
-  let item = { id: uid("check"), profileId: profile.id, prompt, answer: null };
+  let item = { id: uid("check"), profileId: profile.id, prompt, answer: null, createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("checklist_items", {
@@ -836,6 +898,75 @@ async function persistChecklistLog(item, answer) {
   } catch (error) {
     console.error(error);
     notify("Supabase checklist update failed.");
+  }
+}
+
+async function deleteItem(kind, id) {
+  const collectionName = collectionForKind(kind);
+  const table = tableForKind(kind);
+  if (!collectionName || !table) return;
+  if (!window.confirm("Delete this item?")) return;
+
+  state[collectionName] = state[collectionName].filter((item) => item.id !== id);
+  saveState();
+  render();
+  notify("Item deleted.");
+
+  if (!isUuid(id)) return;
+  try {
+    await supabaseRequest(table, {
+      method: "DELETE",
+      query: `?id=eq.${id}`,
+      prefer: "return=minimal"
+    });
+  } catch (error) {
+    console.error(error);
+    notify("Supabase delete failed.");
+  }
+}
+
+function moveItem(kind, id, delta) {
+  const collectionName = collectionForKind(kind);
+  if (!collectionName) return;
+
+  const visible = visibleItemsForKind(kind);
+  const index = visible.findIndex((item) => item.id === id);
+  const nextIndex = index + delta;
+  if (index < 0 || nextIndex < 0 || nextIndex >= visible.length) return;
+
+  const reordered = [...visible];
+  const [item] = reordered.splice(index, 1);
+  reordered.splice(nextIndex, 0, item);
+
+  const timestampBase = Date.now();
+  const createdAtById = new Map(reordered.map((entry, order) => [
+    entry.id,
+    new Date(timestampBase + order * 1000).toISOString()
+  ]));
+
+  state[collectionName] = state[collectionName].map((entry) => (
+    createdAtById.has(entry.id) ? { ...entry, createdAt: createdAtById.get(entry.id) } : entry
+  ));
+  saveState();
+  render();
+  persistOrder(kind, reordered.map((entry) => ({ ...entry, createdAt: createdAtById.get(entry.id) })));
+}
+
+async function persistOrder(kind, orderedItems) {
+  const table = tableForKind(kind);
+  if (!table) return;
+  try {
+    await Promise.all(orderedItems
+      .filter((item) => isUuid(item.id))
+      .map((item) => supabaseRequest(table, {
+        method: "PATCH",
+        query: `?id=eq.${item.id}`,
+        body: { created_at: item.createdAt }
+      })));
+    notify("Order saved.");
+  } catch (error) {
+    console.error(error);
+    notify("Supabase order update failed.");
   }
 }
 

@@ -568,7 +568,7 @@ textarea {
 }
 
 .task-item {
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   border-left: 9px solid var(--line);
 }
@@ -617,6 +617,28 @@ textarea {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.reorder-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.mini-button {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 900;
+  box-shadow: 2px 2px 0 rgba(23, 33, 29, 0.12);
+}
+
+.mini-button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.14);
 }
 
 .status-dot {
@@ -730,7 +752,7 @@ textarea {
 
 .habit-item,
 .check-item {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
 }
 
@@ -867,6 +889,10 @@ textarea {
   }
 
   .task-actions {
+    justify-content: flex-start;
+  }
+
+  .reorder-actions {
     justify-content: flex-start;
   }
 
