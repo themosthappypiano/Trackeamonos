@@ -16,6 +16,7 @@ create table public.tasks (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
   title text not null,
+  description text not null default '',
   task_date date not null default current_date,
   status text not null default 'ready' check (status in ('ready', 'in_progress', 'done')),
   created_at timestamptz not null default now(),

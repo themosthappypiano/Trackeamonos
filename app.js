@@ -2,8 +2,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 const SUPABASE_URL = "https://gihhrbhxteroccaebgxs.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpaGhyYmh4dGVyb2NjYWViZ3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MTQzOTgsImV4cCI6MjA5OTE5MDM5OH0.nkJdaOfbabk2V_p0cgIshARuuGs3JVi99Wz18g-83BA";
 const USE_SUPABASE = true;
+const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
+
+let gifSources = [DEFAULT_GIF_SRC];
+let brandGifSrc = DEFAULT_GIF_SRC;
+let loadingGifSrc = DEFAULT_GIF_SRC;
 
 const seed = {
+  loading: USE_SUPABASE,
   activeProfileId: null,
   activeTab: "tasks",
   sidebarOpen: false,
@@ -53,6 +59,29 @@ function saveState() {
   localStorage.setItem("traquea-monos-state", JSON.stringify(state));
 }
 
+async function loadGifSources() {
+  try {
+    const response = await fetch("./loads/gifs.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("GIF manifest missing");
+    const filenames = await response.json();
+    const sources = filenames
+      .filter((filename) => typeof filename === "string" && filename.trim())
+      .map((filename) => `./loads/${filename}`);
+    if (sources.length) gifSources = sources;
+  } catch (error) {
+    console.warn(error);
+    gifSources = [DEFAULT_GIF_SRC];
+  }
+}
+
+function randomGifSrc() {
+  return gifSources[Math.floor(Math.random() * gifSources.length)] || DEFAULT_GIF_SRC;
+}
+
+function appImage(src, className, alt = "") {
+  return `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" ${alt ? "" : "aria-hidden=\"true\""} />`;
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
 }
@@ -95,6 +124,7 @@ function mapTask(row) {
     id: row.id,
     profileId: row.profile_id,
     title: row.title,
+    description: row.description || "",
     date: row.task_date,
     status: row.status,
     createdAt: row.created_at
@@ -214,15 +244,17 @@ function visibleItemsForKind(kind) {
   const collection = state[collectionForKind(kind)] || [];
   return collection
     .filter((item) => item.profileId === profile.id)
-    .filter((item) => kind !== "tasks" || item.date === today())
+    .filter((item) => kind !== "tasks" || (item.status !== "done" && item.date <= today()))
     .sort(compareItems);
 }
 
 let dragState = null;
 
 function stats(profileId) {
-  const tasks = state.tasks.filter((task) => task.profileId === profileId && task.date === today());
-  const done = tasks.filter((task) => task.status === "done").length;
+  const dueTasks = state.tasks.filter((task) => task.profileId === profileId && task.date <= today());
+  const activeTasks = dueTasks.filter((task) => task.status !== "done");
+  const done = state.tasks.filter((task) => task.profileId === profileId && task.date === today() && task.status === "done").length;
+  const overdue = dueTasks.filter((task) => task.status !== "done" && task.date < today()).length;
   const habits = state.habits.filter((habit) => habit.profileId === profileId);
   const habitScore = habits.length
     ? Math.round(habits.reduce((sum, habit) => sum + Math.min(habit.count / habit.target, 1), 0) / habits.length * 100)
@@ -230,10 +262,15 @@ function stats(profileId) {
   const checklist = state.checklist.filter((item) => item.profileId === profileId);
   const clean = checklist.filter((item) => item.answer === false).length;
   const answered = checklist.filter((item) => item.answer !== null).length;
-  const xp = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5;
+  const xp = Math.max(0, done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5 - overdue * 20);
   const level = Math.floor(xp / 100) + 1;
   const levelProgress = xp % 100;
-  return { tasks: tasks.length, done, habitScore, clean, checklist: checklist.length, answered, xp, level, levelProgress };
+  return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: checklist.length, answered, xp, level, levelProgress };
+}
+
+function allHabitsComplete(profileId, habits = state.habits) {
+  const profileHabits = habits.filter((habit) => habit.profileId === profileId);
+  return profileHabits.length > 0 && profileHabits.every((habit) => habit.count >= habit.target);
 }
 
 function profileImage(profile, size = "normal") {
@@ -250,7 +287,7 @@ async function hydrateFromSupabase() {
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
-      state = { ...state, profiles: [], tasks: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
+      state = { ...state, loading: false, profiles: [], tasks: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
       saveState();
       render();
       notify("Supabase connected. No profiles yet.");
@@ -273,6 +310,7 @@ async function hydrateFromSupabase() {
       habits: habits.map((habit) => mapHabit(habit, habitLogs)),
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs))),
       gratitude: gratitude.map(mapGratitude),
+      loading: false,
       activeProfileId: profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0],
       ...closeOpenForms(),
       gratitudeOpen: false
@@ -282,11 +320,19 @@ async function hydrateFromSupabase() {
     notify("Supabase connected.");
   } catch (error) {
     console.error(error);
+    state = { ...state, loading: false };
+    saveState();
+    render();
     notify("Supabase needs the SQL schema first.");
   }
 }
 
 function render() {
+  if (state.loading) {
+    renderLoadingApp();
+    return;
+  }
+
   const profile = activeProfile();
   if (!profile) {
     renderEmptyApp();
@@ -298,7 +344,7 @@ function render() {
       <div class="backdrop ${state.sidebarOpen ? "open" : ""}" data-action="close-sidebar"></div>
       <aside class="sidebar ${state.sidebarOpen ? "open" : ""}">
         <div class="brand">
-          <img class="monkey-mark" src="./loads/app-logo.jpg" alt="" aria-hidden="true" />
+          ${appImage(brandGifSrc, "monkey-mark")}
           <div>
             <h1>Traquea Monos</h1>
             <p>shared progress tracker</p>
@@ -313,14 +359,14 @@ function render() {
           ${state.profiles.map((person) => {
             const personStats = stats(person.id);
             return `
-              <button class="profile-card ${person.id === profile.id ? "active" : ""}" data-profile="${person.id}">
+              <div class="profile-card ${person.id === profile.id ? "active" : ""}" data-profile="${person.id}" role="button" tabindex="0">
                 ${profileImage(person)}
                 <span class="profile-copy">
                   <strong>${escapeHtml(person.name)}</strong>
                   <span>Lvl ${personStats.level} · ${personStats.xp} XP</span>
                 </span>
                 <b class="streak-badge">🔥 ${person.streak}</b>
-              </button>
+              </div>
             `;
           }).join("")}
         </div>
@@ -363,12 +409,21 @@ function render() {
   bindEvents();
 }
 
+function renderLoadingApp() {
+  document.querySelector("#app").innerHTML = `
+    <main class="loading-screen">
+      ${appImage(loadingGifSrc, "loading-monkey", "Loading monkey")}
+      <h1>Monkey business loading...</h1>
+    </main>
+  `;
+}
+
 function renderEmptyApp() {
   document.querySelector("#app").innerHTML = `
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <img class="monkey-mark" src="./loads/app-logo.jpg" alt="" aria-hidden="true" />
+          ${appImage(brandGifSrc, "monkey-mark")}
           <div>
             <h1>Traquea Monos</h1>
             <p>shared progress tracker</p>
@@ -383,9 +438,9 @@ function renderEmptyApp() {
       </aside>
       <main class="main">
         <section class="empty-start">
-          <img class="empty-logo" src="./loads/app-logo.jpg" alt="" aria-hidden="true" />
-          <h2>Create your first profile</h2>
-          <p>Supabase is connected. Add a profile to start tracking real tasks, habits, checklist items, and gratitude.</p>
+          ${appImage(randomGifSrc(), "empty-logo")}
+          <h2>No profiles yet</h2>
+          <p>Add a profile when you are ready to start tracking tasks, habits, checklist items, and gratitude.</p>
           <button class="pill-button primary" data-action="add-profile">+ Add profile</button>
         </section>
       </main>
@@ -439,19 +494,19 @@ function closeOpenForms() {
 
 function renderTasks() {
   const tasks = byProfile(state.tasks)
-    .filter((task) => task.date === today())
+    .filter((task) => task.status !== "done" && task.date <= today())
     .sort(compareItems);
   return `
     <div class="section-head">
       <div>
         <h3>Tasks</h3>
-        <span>Only today's tasks show here. Tomorrow starts clean.</span>
       </div>
       <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
     </div>
     ${state.taskFormOpen ? `
       <form class="add-card" id="task-form">
         <input id="task-title" placeholder="Task name" required />
+        <textarea id="task-description" placeholder="Description optional"></textarea>
         <input id="task-date" type="date" value="${today()}" />
         <button class="pill-button primary" type="submit">Create</button>
       </form>
@@ -462,13 +517,14 @@ function renderTasks() {
           <div class="item-title">
             <strong>${escapeHtml(task.title)}</strong>
             ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
+            ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ""}
           </div>
           <div class="task-actions">
             <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
             <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
           </div>
         </article>
-      `).join("") : `<div class="empty">No tasks for today. Future tasks will show on their date.</div>`}
+      `).join("") : `<div class="empty">No active tasks. Future tasks will show on their date.</div>`}
     </div>
   `;
 }
@@ -609,6 +665,15 @@ function bindEvents() {
 
   document.querySelectorAll("[data-profile]").forEach((node) => {
     node.addEventListener("click", () => setState({ activeProfileId: node.dataset.profile, sidebarOpen: false, ...closeOpenForms() }));
+    node.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      deleteProfile(node.dataset.profile);
+    });
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      setState({ activeProfileId: node.dataset.profile, sidebarOpen: false, ...closeOpenForms() });
+    });
     node.addEventListener("dblclick", () => setState({ activeProfileId: node.dataset.profile, activeTab: "tasks", sidebarOpen: false, ...closeOpenForms() }));
   });
 
@@ -635,25 +700,32 @@ function bindEvents() {
       const [id, status] = node.dataset.taskStatus.split(":");
       const current = state.tasks.find((task) => task.id === id);
       const nextStatus = current?.status === status ? "ready" : status;
+      const completedNow = current?.status !== "done" && nextStatus === "done";
       state.tasks = state.tasks.map((task) => task.id === id ? { ...task, status: nextStatus } : task);
       saveState();
       render();
       persistTaskStatus(id, nextStatus);
-      notify(nextStatus === "done" ? "Task done. XP locked in." : "Task updated.");
+      notify(nextStatus === "done" ? "Task done. XP locked in." : "Task updated.", { gif: completedNow });
     });
   });
 
   document.querySelectorAll("[data-habit-count]").forEach((node) => {
     node.addEventListener("click", () => {
       const [id, delta] = node.dataset.habitCount.split(":");
+      const profileId = activeProfile()?.id;
+      const completedBefore = profileId ? allHabitsComplete(profileId) : false;
+      const current = state.habits.find((habit) => habit.id === id);
+      const habitWasComplete = current ? current.count >= current.target : false;
       state.habits = state.habits.map((habit) => habit.id === id
         ? { ...habit, count: Math.max(0, Math.min(habit.target, habit.count + Number(delta))) }
         : habit);
       const updated = state.habits.find((habit) => habit.id === id);
+      const habitCompletedNow = updated ? !habitWasComplete && updated.count >= updated.target : false;
+      const completedNow = profileId ? !completedBefore && allHabitsComplete(profileId) : false;
       saveState();
       render();
       if (updated) persistHabitLog(updated);
-      notify("Habit progress saved.");
+      notify(completedNow ? "All habits complete." : habitCompletedNow ? "Habit complete." : "Habit progress saved.", { gif: completedNow || habitCompletedNow });
     });
   });
 
@@ -702,10 +774,11 @@ function handleAction(action) {
 async function addTask(event) {
   event.preventDefault();
   const title = document.querySelector("#task-title").value.trim();
+  const description = (document.querySelector("#task-description")?.value || "").trim();
   const date = document.querySelector("#task-date").value || today();
   if (!title) return;
   const profile = activeProfile();
-  let task = { id: uid("task"), profileId: profile.id, title, date, status: "ready", createdAt: new Date().toISOString() };
+  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("tasks", {
@@ -713,6 +786,7 @@ async function addTask(event) {
         body: {
           profile_id: profile.id,
           title,
+          description,
           task_date: date,
           status: "ready"
         }
@@ -900,6 +974,41 @@ async function deleteItem(kind, id) {
   }
 }
 
+async function deleteProfile(id) {
+  const profile = state.profiles.find((item) => item.id === id);
+  if (!profile) return;
+  if (!window.confirm(`Delete ${profile.name}? This removes their tasks, habits, checklist items, and gratitude.`)) return;
+
+  const remainingProfiles = state.profiles.filter((item) => item.id !== id);
+  state = {
+    ...state,
+    profiles: remainingProfiles,
+    tasks: state.tasks.filter((item) => item.profileId !== id),
+    habits: state.habits.filter((item) => item.profileId !== id),
+    checklist: state.checklist.filter((item) => item.profileId !== id),
+    gratitude: state.gratitude.filter((item) => item.profileId !== id),
+    activeProfileId: state.activeProfileId === id ? remainingProfiles[0]?.id || null : state.activeProfileId,
+    ...closeOpenForms(),
+    settingsOpen: false,
+    gratitudeOpen: false
+  };
+  saveState();
+  render();
+  notify("Profile deleted.");
+
+  if (!isUuid(id)) return;
+  try {
+    await supabaseRequest("profiles", {
+      method: "DELETE",
+      query: `?id=eq.${id}`,
+      prefer: "return=minimal"
+    });
+  } catch (error) {
+    console.error(error);
+    notify("Supabase profile delete failed.");
+  }
+}
+
 function startDrag(event) {
   if (event.target.closest("button, input, textarea, label")) return;
   const node = event.currentTarget;
@@ -1062,18 +1171,31 @@ async function saveGratitude() {
   notify("Gratitude saved.");
 }
 
-function notify(message) {
+function notify(message, options = {}) {
   const existing = document.querySelector(".toast");
   if (existing) existing.remove();
 
   const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.innerHTML = `<strong>Nice</strong><span>${escapeHtml(message)}</span>`;
+  toast.className = `toast ${options.gif ? "with-gif celebration-toast" : ""}`;
+  toast.innerHTML = `
+    ${options.gif ? appImage(randomGifSrc(), "toast-gif", "Celebration monkey") : ""}
+    <div>
+      <strong>${options.gif ? "Well done" : "Nice"}</strong>
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
   document.body.appendChild(toast);
   window.setTimeout(() => toast.classList.add("show"), 20);
-  window.setTimeout(() => toast.classList.remove("show"), 2200);
-  window.setTimeout(() => toast.remove(), 2700);
+  window.setTimeout(() => toast.classList.remove("show"), options.gif ? 3200 : 2200);
+  window.setTimeout(() => toast.remove(), options.gif ? 3700 : 2700);
 }
 
-render();
-hydrateFromSupabase();
+async function boot() {
+  await loadGifSources();
+  brandGifSrc = randomGifSrc();
+  loadingGifSrc = randomGifSrc();
+  render();
+  hydrateFromSupabase();
+}
+
+boot();
