@@ -15,6 +15,7 @@ const SYNC_INTERVAL_MS = 5000;
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
 let loadingGifSrc = DEFAULT_GIF_SRC;
+let dailyGifSrc = DEFAULT_GIF_SRC;
 let syncInFlight = false;
 let syncTimer = null;
 let lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
@@ -87,6 +88,14 @@ async function loadGifSources() {
 
 function randomGifSrc() {
   return gifSources[Math.floor(Math.random() * gifSources.length)] || DEFAULT_GIF_SRC;
+}
+
+function dailyGifForDate(dateKey = today()) {
+  let hash = 0;
+  for (const char of dateKey) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return gifSources[hash % gifSources.length] || DEFAULT_GIF_SRC;
 }
 
 function appImage(src, className, alt = "") {
@@ -424,6 +433,7 @@ function render() {
           <button class="icon-button" title="Profile settings" data-action="toggle-settings">⚙</button>
         </div>
         ${renderSidebarSettings(profile)}
+        ${renderDailyGif()}
         <div class="profile-list">
           ${state.profiles.map((person) => {
             const personStats = stats(person.id);
@@ -501,6 +511,7 @@ function renderEmptyApp() {
         <div class="profile-actions">
           <button class="pill-button primary" data-action="add-profile">+ Profile</button>
         </div>
+        ${renderDailyGif()}
         <div class="profile-list">
           <div class="empty">No profiles yet.</div>
         </div>
@@ -534,6 +545,18 @@ function renderSidebarSettings(profile) {
       <div class="settings-actions">
         <button class="pill-button primary" data-action="save-profile">Save</button>
         <button class="pill-button" data-action="reset-demo">Reset</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderDailyGif() {
+  return `
+    <section class="daily-gif">
+      ${appImage(dailyGifSrc, "daily-gif-image", "Daily GIF")}
+      <div>
+        <strong>Daily GIF</strong>
+        <span>${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
       </div>
     </section>
   `;
@@ -1283,6 +1306,7 @@ function notify(message, options = {}) {
 
 async function boot() {
   await loadGifSources();
+  dailyGifSrc = dailyGifForDate();
   brandGifSrc = randomGifSrc();
   loadingGifSrc = randomGifSrc();
   render();

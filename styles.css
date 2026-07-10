@@ -126,6 +126,45 @@ button {
   color: var(--muted);
 }
 
+.daily-gif {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff7dc;
+  box-shadow: 4px 4px 0 rgba(244, 184, 59, 0.22);
+}
+
+.daily-gif-image {
+  width: 74px;
+  height: 74px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  object-fit: cover;
+}
+
+.daily-gif strong,
+.daily-gif span {
+  display: block;
+}
+
+.daily-gif strong {
+  font-size: 15px;
+  line-height: 1.1;
+}
+
+.daily-gif span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .profile-actions,
 .settings-actions,
 .tab-row,
