@@ -1,12 +1,23 @@
-const today = () => new Date().toISOString().slice(0, 10);
+const localDateKey = (date = new Date()) => {
+  const local = date instanceof Date ? date : new Date(date);
+  const year = local.getFullYear();
+  const month = String(local.getMonth() + 1).padStart(2, "0");
+  const day = String(local.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const today = () => localDateKey();
 const SUPABASE_URL = "https://gihhrbhxteroccaebgxs.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpaGhyYmh4dGVyb2NjYWViZ3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MTQzOTgsImV4cCI6MjA5OTE5MDM5OH0.nkJdaOfbabk2V_p0cgIshARuuGs3JVi99Wz18g-83BA";
 const USE_SUPABASE = true;
 const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
+const SYNC_INTERVAL_MS = 5000;
 
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
 let loadingGifSrc = DEFAULT_GIF_SRC;
+let syncInFlight = false;
+let syncTimer = null;
+let lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
 
 const seed = {
   loading: USE_SUPABASE,
@@ -127,6 +138,7 @@ function mapTask(row) {
     description: row.description || "",
     date: row.task_date,
     status: row.status,
+    completedAt: row.completed_at || null,
     createdAt: row.created_at
   };
 }
@@ -244,16 +256,27 @@ function visibleItemsForKind(kind) {
   const collection = state[collectionForKind(kind)] || [];
   return collection
     .filter((item) => item.profileId === profile.id)
-    .filter((item) => kind !== "tasks" || (item.status !== "done" && item.date <= today()))
+    .filter((item) => kind !== "tasks" || isTaskVisibleToday(item))
     .sort(compareItems);
 }
 
 let dragState = null;
 
+function taskCompletedDate(task) {
+  if (!task.completedAt) return task.date;
+  return localDateKey(task.completedAt);
+}
+
+function isTaskVisibleToday(task) {
+  if (task.date > today()) return false;
+  if (task.status !== "done") return true;
+  return taskCompletedDate(task) === today();
+}
+
 function stats(profileId) {
   const dueTasks = state.tasks.filter((task) => task.profileId === profileId && task.date <= today());
   const activeTasks = dueTasks.filter((task) => task.status !== "done");
-  const done = state.tasks.filter((task) => task.profileId === profileId && task.date === today() && task.status === "done").length;
+  const done = dueTasks.filter((task) => task.status === "done" && taskCompletedDate(task) === today()).length;
   const overdue = dueTasks.filter((task) => task.status !== "done" && task.date < today()).length;
   const habits = state.habits.filter((habit) => habit.profileId === profileId);
   const habitScore = habits.length
@@ -280,8 +303,16 @@ function profileImage(profile, size = "normal") {
   return `<span class="avatar ${size}" style="--avatar-color:${profile.color}">${content}</span>`;
 }
 
-async function hydrateFromSupabase() {
+function shouldDelayBackgroundSync() {
+  if (state.loading) return true;
+  if (state.taskFormOpen || state.habitFormOpen || state.checkFormOpen || state.settingsOpen || state.gratitudeOpen) return true;
+  return Boolean(document.activeElement?.closest?.("input, textarea, select"));
+}
+
+async function hydrateFromSupabase({ silent = false, preserveUi = false } = {}) {
   if (!USE_SUPABASE) return;
+  if (syncInFlight || (silent && shouldDelayBackgroundSync())) return;
+  syncInFlight = true;
   try {
     const profiles = await supabaseRequest("profiles", { query: "?select=*&order=created_at.asc" });
 
@@ -290,7 +321,7 @@ async function hydrateFromSupabase() {
       state = { ...state, loading: false, profiles: [], tasks: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
       saveState();
       render();
-      notify("Supabase connected. No profiles yet.");
+      if (!silent) notify("Supabase connected. No profiles yet.");
       return;
     }
     const idFilter = `(${profileIds.join(",")})`;
@@ -303,7 +334,19 @@ async function hydrateFromSupabase() {
       supabaseRequest("daily_gratitude", { query: `?select=*&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` })
     ]);
 
-    state = {
+    const uiState = preserveUi ? {
+      activeTab: state.activeTab,
+      sidebarOpen: state.sidebarOpen,
+      settingsOpen: state.settingsOpen,
+      taskFormOpen: state.taskFormOpen,
+      habitFormOpen: state.habitFormOpen,
+      checkFormOpen: state.checkFormOpen,
+      gratitudeOpen: state.gratitudeOpen
+    } : {
+      ...closeOpenForms(),
+      gratitudeOpen: false
+    };
+    const nextState = {
       ...state,
       profiles: profiles.map(mapProfile),
       tasks: tasks.map(mapTask),
@@ -312,19 +355,45 @@ async function hydrateFromSupabase() {
       gratitude: gratitude.map(mapGratitude),
       loading: false,
       activeProfileId: profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0],
-      ...closeOpenForms(),
-      gratitudeOpen: false
+      ...uiState
     };
+    const changed = JSON.stringify({
+      profiles: state.profiles,
+      tasks: state.tasks,
+      habits: state.habits,
+      checklist: state.checklist,
+      gratitude: state.gratitude,
+      activeProfileId: state.activeProfileId
+    }) !== JSON.stringify({
+      profiles: nextState.profiles,
+      tasks: nextState.tasks,
+      habits: nextState.habits,
+      checklist: nextState.checklist,
+      gratitude: nextState.gratitude,
+      activeProfileId: nextState.activeProfileId
+    });
+    state = nextState;
     saveState();
-    render();
-    notify("Supabase connected.");
+    if (!silent || changed) render();
+    if (!silent) notify("Supabase connected.");
   } catch (error) {
     console.error(error);
     state = { ...state, loading: false };
     saveState();
-    render();
-    notify("Supabase needs the SQL schema first.");
+    if (!silent) render();
+    if (!silent) notify("Supabase needs the SQL schema first.");
+  } finally {
+    syncInFlight = false;
   }
+}
+
+function startBackgroundSync() {
+  if (!USE_SUPABASE || syncTimer) return;
+  syncTimer = window.setInterval(() => hydrateFromSupabase({ silent: true, preserveUi: true }), SYNC_INTERVAL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) hydrateFromSupabase({ silent: true, preserveUi: true });
+  });
+  window.addEventListener("focus", () => hydrateFromSupabase({ silent: true, preserveUi: true }));
 }
 
 function render() {
@@ -494,7 +563,7 @@ function closeOpenForms() {
 
 function renderTasks() {
   const tasks = byProfile(state.tasks)
-    .filter((task) => task.status !== "done" && task.date <= today())
+    .filter(isTaskVisibleToday)
     .sort(compareItems);
   return `
     <div class="section-head">
@@ -689,6 +758,26 @@ function bindEvents() {
     };
     node.addEventListener("contextmenu", deleteFromCard);
     node.addEventListener("dblclick", deleteFromCard);
+    node.addEventListener("pointerup", (event) => {
+      if (event.pointerType === "mouse" || event.target.closest("button, input, textarea, label")) return;
+      if (dragState?.moved) return;
+      const now = Date.now();
+      const distance = Math.hypot(event.clientX - lastDeleteTap.x, event.clientY - lastDeleteTap.y);
+      const sameCard = lastDeleteTap.kind === node.dataset.deleteKind && lastDeleteTap.id === node.dataset.deleteId;
+      if (sameCard && now - lastDeleteTap.time < 520 && distance < 28) {
+        event.preventDefault();
+        lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
+        deleteItem(node.dataset.deleteKind, node.dataset.deleteId);
+        return;
+      }
+      lastDeleteTap = {
+        kind: node.dataset.deleteKind,
+        id: node.dataset.deleteId,
+        time: now,
+        x: event.clientX,
+        y: event.clientY
+      };
+    });
   });
 
   document.querySelectorAll("[data-drag-kind]").forEach((node) => {
@@ -701,7 +790,9 @@ function bindEvents() {
       const current = state.tasks.find((task) => task.id === id);
       const nextStatus = current?.status === status ? "ready" : status;
       const completedNow = current?.status !== "done" && nextStatus === "done";
-      state.tasks = state.tasks.map((task) => task.id === id ? { ...task, status: nextStatus } : task);
+      state.tasks = state.tasks.map((task) => task.id === id
+        ? { ...task, status: nextStatus, completedAt: nextStatus === "done" ? new Date().toISOString() : null }
+        : task);
       saveState();
       render();
       persistTaskStatus(id, nextStatus);
@@ -778,7 +869,7 @@ async function addTask(event) {
   const date = document.querySelector("#task-date").value || today();
   if (!title) return;
   const profile = activeProfile();
-  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", createdAt: new Date().toISOString() };
+  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", completedAt: null, createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("tasks", {
@@ -1195,7 +1286,8 @@ async function boot() {
   brandGifSrc = randomGifSrc();
   loadingGifSrc = randomGifSrc();
   render();
-  hydrateFromSupabase();
+  await hydrateFromSupabase();
+  startBackgroundSync();
 }
 
 boot();
