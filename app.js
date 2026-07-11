@@ -11,6 +11,8 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const USE_SUPABASE = true;
 const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
 const SYNC_INTERVAL_MS = 5000;
+const REQUEST_TIMEOUT_MS = 12000;
+const ASSET_TIMEOUT_MS = 5000;
 
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
@@ -40,9 +42,9 @@ const seed = {
 let state = loadState();
 
 function loadState() {
-  const base = structuredClone(seed);
+  const base = cloneState(seed);
   if (USE_SUPABASE) return base;
-  const saved = localStorage.getItem("traquea-monos-state");
+  const saved = readStoredState();
   if (!saved) return base;
   try {
     const parsed = JSON.parse(saved);
@@ -68,12 +70,60 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem("traquea-monos-state", JSON.stringify(state));
+  try {
+    localStorage.setItem("traquea-monos-state", JSON.stringify(state));
+  } catch (error) {
+    console.warn("State could not be saved locally.", error);
+  }
+}
+
+function cloneState(value) {
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readStoredState() {
+  try {
+    return localStorage.getItem("traquea-monos-state");
+  } catch (error) {
+    console.warn("Stored state could not be read.", error);
+    return null;
+  }
+}
+
+async function fetchWithTimeout(resource, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  let timeoutId;
+  const timeoutError = new Error("Request timed out");
+
+  if (typeof AbortController === "undefined") {
+    try {
+      return await Promise.race([
+        fetch(resource, options),
+        new Promise((_, reject) => {
+          timeoutId = globalThis.setTimeout(() => reject(timeoutError), timeoutMs);
+        })
+      ]);
+    } finally {
+      globalThis.clearTimeout(timeoutId);
+    }
+  }
+
+  const controller = new AbortController();
+  timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(resource, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error.name === "AbortError") throw timeoutError;
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
 }
 
 async function loadGifSources() {
   try {
-    const response = await fetch("./loads/gifs.json", { cache: "no-store" });
+    const response = await fetchWithTimeout("./loads/gifs.json", { cache: "no-store" }, ASSET_TIMEOUT_MS);
     if (!response.ok) throw new Error("GIF manifest missing");
     const filenames = await response.json();
     const sources = filenames
@@ -108,7 +158,7 @@ function isUuid(value) {
 
 async function supabaseRequest(table, { method = "GET", query = "", body, prefer = "return=representation" } = {}) {
   if (!USE_SUPABASE) return null;
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
+  const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
     method,
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -879,8 +929,12 @@ function handleAction(action) {
   if (action === "save-profile") saveProfile();
   if (action === "save-gratitude") saveGratitude();
   if (action === "reset-demo") {
-    localStorage.removeItem("traquea-monos-state");
-    state = structuredClone(seed);
+    try {
+      localStorage.removeItem("traquea-monos-state");
+    } catch (error) {
+      console.warn("Stored state could not be cleared.", error);
+    }
+    state = cloneState(seed);
     render();
   }
 }
@@ -1305,13 +1359,19 @@ function notify(message, options = {}) {
 }
 
 async function boot() {
-  await loadGifSources();
-  dailyGifSrc = dailyGifForDate();
-  brandGifSrc = randomGifSrc();
-  loadingGifSrc = randomGifSrc();
-  render();
-  await hydrateFromSupabase();
-  startBackgroundSync();
+  try {
+    await loadGifSources();
+    dailyGifSrc = dailyGifForDate();
+    brandGifSrc = randomGifSrc();
+    loadingGifSrc = randomGifSrc();
+    render();
+    await hydrateFromSupabase();
+    startBackgroundSync();
+  } catch (error) {
+    console.error(error);
+    state = { ...state, loading: false };
+    render();
+  }
 }
 
 boot();
