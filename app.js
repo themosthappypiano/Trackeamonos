@@ -10,7 +10,6 @@ const SUPABASE_URL = "https://gihhrbhxteroccaebgxs.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpaGhyYmh4dGVyb2NjYWViZ3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MTQzOTgsImV4cCI6MjA5OTE5MDM5OH0.nkJdaOfbabk2V_p0cgIshARuuGs3JVi99Wz18g-83BA";
 const USE_SUPABASE = true;
 const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
-const SYNC_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 12000;
 const ASSET_TIMEOUT_MS = 5000;
 
@@ -19,7 +18,6 @@ let brandGifSrc = DEFAULT_GIF_SRC;
 let loadingGifSrc = DEFAULT_GIF_SRC;
 let dailyGifSrc = DEFAULT_GIF_SRC;
 let syncInFlight = false;
-let syncTimer = null;
 let lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
 
 const seed = {
@@ -362,46 +360,32 @@ function profileImage(profile, size = "normal") {
   return `<span class="avatar ${size}" style="--avatar-color:${profile.color}">${content}</span>`;
 }
 
-function shouldDelayBackgroundSync() {
-  if (state.loading) return true;
-  if (state.taskFormOpen || state.habitFormOpen || state.checkFormOpen || state.settingsOpen || state.gratitudeOpen) return true;
-  return Boolean(document.activeElement?.closest?.("input, textarea, select"));
-}
-
-async function hydrateFromSupabase({ silent = false, preserveUi = false } = {}) {
+async function hydrateFromSupabase() {
   if (!USE_SUPABASE) return;
-  if (syncInFlight || (silent && shouldDelayBackgroundSync())) return;
+  if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=*&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,created_at&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
       state = { ...state, loading: false, profiles: [], tasks: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
       saveState();
       render();
-      if (!silent) notify("Supabase connected. No profiles yet.");
+      notify("Supabase connected. No profiles yet.");
       return;
     }
     const idFilter = `(${profileIds.join(",")})`;
     const [tasks, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
-      supabaseRequest("tasks", { query: `?select=*&profile_id=in.${idFilter}&order=task_date.asc,created_at.asc` }),
-      supabaseRequest("habits", { query: `?select=*&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
-      supabaseRequest("habit_logs", { query: `?select=*&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
-      supabaseRequest("checklist_items", { query: `?select=*&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
-      supabaseRequest("daily_checklist_logs", { query: `?select=*&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
-      supabaseRequest("daily_gratitude", { query: `?select=*&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` })
+      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,created_at,completed_at&profile_id=in.${idFilter}&order=task_date.asc,created_at.asc` }),
+      supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
+      supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
+      supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
+      supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
+      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` })
     ]);
 
-    const uiState = preserveUi ? {
-      activeTab: state.activeTab,
-      sidebarOpen: state.sidebarOpen,
-      settingsOpen: state.settingsOpen,
-      taskFormOpen: state.taskFormOpen,
-      habitFormOpen: state.habitFormOpen,
-      checkFormOpen: state.checkFormOpen,
-      gratitudeOpen: state.gratitudeOpen
-    } : {
+    const uiState = {
       ...closeOpenForms(),
       gratitudeOpen: false
     };
@@ -433,26 +417,17 @@ async function hydrateFromSupabase({ silent = false, preserveUi = false } = {}) 
     });
     state = nextState;
     saveState();
-    if (!silent || changed) render();
-    if (!silent) notify("Supabase connected.");
+    if (changed) render();
+    notify("Supabase connected.");
   } catch (error) {
     console.error(error);
     state = { ...state, loading: false };
     saveState();
-    if (!silent) render();
-    if (!silent) notify("Supabase needs the SQL schema first.");
+    render();
+    notify("Supabase needs the SQL schema first.");
   } finally {
     syncInFlight = false;
   }
-}
-
-function startBackgroundSync() {
-  if (!USE_SUPABASE || syncTimer) return;
-  syncTimer = window.setInterval(() => hydrateFromSupabase({ silent: true, preserveUi: true }), SYNC_INTERVAL_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) hydrateFromSupabase({ silent: true, preserveUi: true });
-  });
-  window.addEventListener("focus", () => hydrateFromSupabase({ silent: true, preserveUi: true }));
 }
 
 function render() {
@@ -1301,9 +1276,38 @@ function saveProfile() {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = () => applyProfile(reader.result);
-  reader.readAsDataURL(file);
+  resizeProfilePhoto(file)
+    .then(applyProfile)
+    .catch((error) => {
+      console.error(error);
+      notify("That profile picture could not be processed.");
+    });
+}
+
+function resizeProfilePhoto(file) {
+  const MAX_AVATAR_SIZE = 256;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Profile picture could not be read"));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Profile picture is not a valid image"));
+      image.onload = () => {
+        const scale = Math.min(1, MAX_AVATAR_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) return reject(new Error("Canvas is unavailable"));
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/webp", 0.78));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 async function saveGratitude() {
@@ -1366,7 +1370,6 @@ async function boot() {
     loadingGifSrc = randomGifSrc();
     render();
     await hydrateFromSupabase();
-    startBackgroundSync();
   } catch (error) {
     console.error(error);
     state = { ...state, loading: false };
