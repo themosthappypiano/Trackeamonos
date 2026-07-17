@@ -6,8 +6,8 @@ const localDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 const today = () => localDateKey();
-const SUPABASE_URL = "https://gihhrbhxteroccaebgxs.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpaGhyYmh4dGVyb2NjYWViZ3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MTQzOTgsImV4cCI6MjA5OTE5MDM5OH0.nkJdaOfbabk2V_p0cgIshARuuGs3JVi99Wz18g-83BA";
+const SUPABASE_URL = "https://kqzwtsqntmusvdzdjhha.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxend0c3FudG11c3ZkemRqaGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDYyNjYsImV4cCI6MjA5OTgyMjI2Nn0.7t7eqkLURQSJv7v7Kv0N7Kmbly_mmVy-e0xePnLsJxY";
 const USE_SUPABASE = true;
 const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
 const REQUEST_TIMEOUT_MS = 12000;
