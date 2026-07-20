@@ -34,7 +34,8 @@ const seed = {
   tasks: [],
   habits: [],
   checklist: [],
-  gratitude: []
+  gratitude: [],
+  earnedXp: {}
 };
 
 let state = loadState();
@@ -342,10 +343,55 @@ function stats(profileId) {
   const checklist = state.checklist.filter((item) => item.profileId === profileId);
   const clean = checklist.filter((item) => item.answer === false).length;
   const answered = checklist.filter((item) => item.answer !== null).length;
-  const xp = Math.max(0, done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5 - overdue * 20);
+  const earnedToday = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5;
+  const xp = (state.earnedXp[profileId] || 0) + earnedToday;
   const level = Math.floor(xp / 100) + 1;
   const levelProgress = xp % 100;
   return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: checklist.length, answered, xp, level, levelProgress };
+}
+
+function calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs) {
+  const earnedXp = Object.fromEntries(profileIds.map((profileId) => [profileId, 0]));
+
+  for (const task of tasks) {
+    const completedDate = task.completed_at ? localDateKey(task.completed_at) : task.task_date;
+    if (task.status === "done" && completedDate < today()) {
+      earnedXp[task.profile_id] = (earnedXp[task.profile_id] || 0) + 35;
+    }
+  }
+
+  const habitsByProfile = new Map();
+  for (const habit of habits) {
+    const profileHabits = habitsByProfile.get(habit.profile_id) || [];
+    profileHabits.push(habit);
+    habitsByProfile.set(habit.profile_id, profileHabits);
+  }
+
+  const habitDays = new Map();
+  for (const log of habitLogs) {
+    if (log.log_date >= today()) continue;
+    const key = `${log.profile_id}:${log.log_date}`;
+    const logs = habitDays.get(key) || [];
+    logs.push(log);
+    habitDays.set(key, logs);
+  }
+  for (const [key, logs] of habitDays) {
+    const profileId = key.split(":", 1)[0];
+    const profileHabits = habitsByProfile.get(profileId) || [];
+    if (!profileHabits.length) continue;
+    const score = profileHabits.reduce((sum, habit) => {
+      const count = logs.find((log) => log.habit_id === habit.id)?.count || 0;
+      return sum + Math.min(count / habit.target_count, 1);
+    }, 0) / profileHabits.length * 100;
+    earnedXp[profileId] = (earnedXp[profileId] || 0) + Math.round(Math.round(score) * 1.5);
+  }
+
+  for (const log of checklistLogs) {
+    if (log.log_date >= today()) continue;
+    earnedXp[log.profile_id] = (earnedXp[log.profile_id] || 0) + 5 + (log.answer === false ? 20 : 0);
+  }
+
+  return earnedXp;
 }
 
 function allHabitsComplete(profileId, habits = state.habits) {
@@ -379,9 +425,9 @@ async function hydrateFromSupabase() {
     const [tasks, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
       supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,created_at,completed_at&profile_id=in.${idFilter}&order=task_date.asc,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
-      supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
+      supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
       supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
-      supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}&log_date=eq.${today()}` }),
+      supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
       supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` })
     ]);
 
@@ -393,9 +439,10 @@ async function hydrateFromSupabase() {
       ...state,
       profiles: profiles.map(mapProfile),
       tasks: tasks.map(mapTask),
-      habits: habits.map((habit) => mapHabit(habit, habitLogs)),
-      checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs))),
+      habits: habits.map((habit) => mapHabit(habit, habitLogs.filter((log) => log.log_date === today()))),
+      checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
       gratitude: gratitude.map(mapGratitude),
+      earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
       loading: false,
       activeProfileId: profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0],
       ...uiState
