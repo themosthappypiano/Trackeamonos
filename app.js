@@ -18,6 +18,7 @@ let brandGifSrc = DEFAULT_GIF_SRC;
 let loadingGifSrc = DEFAULT_GIF_SRC;
 let dailyGifSrc = DEFAULT_GIF_SRC;
 let syncInFlight = false;
+let taskReorderInFlight = false;
 let lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
 
 const seed = {
@@ -174,7 +175,8 @@ async function supabaseRequest(table, { method = "GET", query = "", body, prefer
   }
 
   if (response.status === 204) return null;
-  return response.json();
+  const responseBody = await response.text();
+  return responseBody ? JSON.parse(responseBody) : null;
 }
 
 function mapProfile(row) {
@@ -196,6 +198,7 @@ function mapTask(row) {
     description: row.description || "",
     date: row.task_date,
     status: row.status,
+    sortOrder: row.sort_order == null ? null : Number(row.sort_order),
     completedAt: row.completed_at || null,
     createdAt: row.created_at
   };
@@ -292,6 +295,14 @@ function compareItems(a, b) {
   return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
 }
 
+function compareTasks(a, b) {
+  const aHasOrder = Number.isInteger(a.sortOrder);
+  const bHasOrder = Number.isInteger(b.sortOrder);
+  if (aHasOrder && bHasOrder && a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+  if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+  return compareItems(a, b) || String(a.id).localeCompare(String(b.id));
+}
+
 function tableForKind(kind) {
   return {
     tasks: "tasks",
@@ -315,7 +326,7 @@ function visibleItemsForKind(kind) {
   return collection
     .filter((item) => item.profileId === profile.id)
     .filter((item) => kind !== "tasks" || isTaskVisibleToday(item))
-    .sort(compareItems);
+    .sort(kind === "tasks" ? compareTasks : compareItems);
 }
 
 let dragState = null;
@@ -423,7 +434,7 @@ async function hydrateFromSupabase() {
     }
     const idFilter = `(${profileIds.join(",")})`;
     const [tasks, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
-      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,created_at,completed_at&profile_id=in.${idFilter}&order=task_date.asc,created_at.asc` }),
+      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,created_at,completed_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
       supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
       supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
@@ -659,7 +670,7 @@ function closeOpenForms() {
 function renderTasks() {
   const tasks = byProfile(state.tasks)
     .filter(isTaskVisibleToday)
-    .sort(compareItems);
+    .sort(compareTasks);
   return `
     <div class="section-head">
       <div>
@@ -968,7 +979,10 @@ async function addTask(event) {
   const date = document.querySelector("#task-date").value || today();
   if (!title) return;
   const profile = activeProfile();
-  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", completedAt: null, createdAt: new Date().toISOString() };
+  const nextSortOrder = Math.max(0, ...state.tasks
+    .filter((item) => item.profileId === profile.id && Number.isInteger(item.sortOrder))
+    .map((item) => item.sortOrder)) + 1;
+  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", sortOrder: nextSortOrder, completedAt: null, createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("tasks", {
@@ -987,7 +1001,7 @@ async function addTask(event) {
       notify("Task saved locally. Supabase failed.");
     }
   }
-  state.tasks.unshift(task);
+  state.tasks.push(task);
   state.taskFormOpen = false;
   saveState();
   render();
@@ -1200,6 +1214,7 @@ async function deleteProfile(id) {
 }
 
 function startDrag(event) {
+  if (taskReorderInFlight && event.currentTarget.dataset.dragKind === "tasks") return;
   if (event.target.closest("button, input, textarea, label")) return;
   const node = event.currentTarget;
   dragState = {
@@ -1238,7 +1253,7 @@ function endDrag(event) {
   if (moved && direction) moveItem(kind, id, direction);
 }
 
-function moveItem(kind, id, delta) {
+async function moveItem(kind, id, delta) {
   const collectionName = collectionForKind(kind);
   if (!collectionName) return;
 
@@ -1250,6 +1265,42 @@ function moveItem(kind, id, delta) {
   const reordered = [...visible];
   const [item] = reordered.splice(index, 1);
   reordered.splice(nextIndex, 0, item);
+
+  if (kind === "tasks") {
+    const profileId = activeProfile()?.id;
+    if (!profileId) return;
+    const previousTasks = state.tasks.map((task) => ({ ...task }));
+    const reorderedVisibleIds = reordered.map((entry) => entry.id);
+    let visibleIndex = 0;
+    const fullOrder = state.tasks
+      .filter((task) => task.profileId === profileId)
+      .sort(compareTasks)
+      .map((task) => reorderedVisibleIds.includes(task.id)
+        ? reordered[visibleIndex++]
+        : task);
+
+    const sortOrderById = new Map(fullOrder.map((task, order) => [task.id, order + 1]));
+    state.tasks = state.tasks.map((task) => sortOrderById.has(task.id)
+      ? { ...task, sortOrder: sortOrderById.get(task.id) }
+      : task);
+    saveState();
+    render();
+
+    taskReorderInFlight = true;
+    try {
+      await persistTaskOrder(profileId, fullOrder.map((task) => task.id));
+      notify("Order saved.");
+    } catch (error) {
+      console.error(error);
+      state.tasks = previousTasks;
+      saveState();
+      render();
+      notify("Task order could not be saved. The previous order was restored.");
+    } finally {
+      taskReorderInFlight = false;
+    }
+    return;
+  }
 
   const timestampBase = Date.now();
   const createdAtById = new Map(reordered.map((entry, order) => [
@@ -1263,6 +1314,18 @@ function moveItem(kind, id, delta) {
   saveState();
   render();
   persistOrder(kind, reordered.map((entry) => ({ ...entry, createdAt: createdAtById.get(entry.id) })));
+}
+
+async function persistTaskOrder(profileId, orderedTaskIds) {
+  if (!isUuid(profileId) || orderedTaskIds.some((id) => !isUuid(id))) return;
+  await supabaseRequest("rpc/reorder_tasks", {
+    method: "POST",
+    body: {
+      profile_id: profileId,
+      ordered_task_ids: orderedTaskIds
+    },
+    prefer: "return=minimal"
+  });
 }
 
 async function persistOrder(kind, orderedItems) {
