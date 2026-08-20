@@ -682,7 +682,10 @@ function renderCalendar() {
         <h3>Calendar</h3>
       </div>
     </div>
-    <div class="empty">No events yet. Calendar coming soon.</div>
+    <div class="empty">
+      <strong>hey there</strong>
+      <div>No events yet. Calendar coming soon.</div>
+    </div>
   `;
 }
 
