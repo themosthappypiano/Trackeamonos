@@ -676,29 +676,56 @@ function renderPanel() {
 }
 
 function renderCalendar() {
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getDay();
-  let calendarGrid = '<div class="calendar-grid">';
-  
-  // Empty cells for days before the first day of the month
-  for (let i = 0; i < firstDay; i++) {
-    calendarGrid += '<div class="calendar-cell empty"></div>';
-  }
-  
-  // Calendar cells for each day of the month
-  for (let day = 1; day <= daysInMonth; day++) {
-    calendarGrid += `<div class="calendar-cell">${day}</div>`;
-  }
-  
-  calendarGrid += '</div>';
-  
   return `
     <div class="section-head">
       <div>
         <h3>Calendar</h3>
       </div>
     </div>
-    ${calendarGrid}
+    <div class="calendar-grid">
+      <div class="calendar-header">
+        <div>Sun</div>
+        <div>Mon</div>
+        <div>Tue</div>
+        <div>Wed</div>
+        <div>Thu</div>
+        <div>Fri</div>
+        <div>Sat</div>
+      </div>
+      <div class="calendar-body">
+        <div class="calendar-cell">1</div>
+        <div class="calendar-cell">2</div>
+        <div class="calendar-cell">3</div>
+        <div class="calendar-cell">4</div>
+        <div class="calendar-cell">5</div>
+        <div class="calendar-cell">6</div>
+        <div class="calendar-cell">7</div>
+        <div class="calendar-cell">8</div>
+        <div class="calendar-cell">9</div>
+        <div class="calendar-cell">10</div>
+        <div class="calendar-cell">11</div>
+        <div class="calendar-cell">12</div>
+        <div class="calendar-cell">13</div>
+        <div class="calendar-cell">14</div>
+        <div class="calendar-cell">15</div>
+        <div class="calendar-cell">16</div>
+        <div class="calendar-cell">17</div>
+        <div class="calendar-cell">18</div>
+        <div class="calendar-cell">19</div>
+        <div class="calendar-cell">20</div>
+        <div class="calendar-cell">21</div>
+        <div class="calendar-cell">22</div>
+        <div class="calendar-cell">23</div>
+        <div class="calendar-cell">24</div>
+        <div class="calendar-cell">25</div>
+        <div class="calendar-cell">26</div>
+        <div class="calendar-cell">27</div>
+        <div class="calendar-cell">28</div>
+        <div class="calendar-cell">29</div>
+        <div class="calendar-cell">30</div>
+        <div class="calendar-cell">31</div>
+      </div>
+    </div>
   `;
 }
 
