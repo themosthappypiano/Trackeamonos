@@ -423,7 +423,14 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,created_at&order=created_at.asc" });
+    let profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,created_at&order=created_at.asc" });
+    
+    // WORKSPACE FILTER: Hide specific profiles from this secret URL
+    profiles = profiles.filter(profile => {
+      const name = (profile.display_name || "").toLowerCase();
+      // Hide your girlfriend's profile (luabubu) from Kayla's view
+      return !name.includes("luabubu");
+    });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
