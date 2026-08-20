@@ -6,5 +6,8 @@ services:
     staticPublishPath: .
     routes:
       - type: rewrite
+        source: /kayla.html
+        destination: /kayla.html
+      - type: rewrite
         source: /*
         destination: /index.html
