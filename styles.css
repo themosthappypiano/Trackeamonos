@@ -628,14 +628,12 @@ textarea {
   gap: 5px;
 }
 
-.calendar-cell {
+.day-box {
   border: 1px solid var(--line);
-  background: var(--panel);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px;
   border-radius: 4px;
+  padding: 8px;
+  background: var(--panel);
+  text-align: center;
 }
 
 .empty {
