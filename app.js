@@ -676,16 +676,29 @@ function renderPanel() {
 }
 
 function renderCalendar() {
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getDay();
+  let calendarGrid = '<div class="calendar-grid">';
+  
+  // Empty cells for days before the first day of the month
+  for (let i = 0; i < firstDay; i++) {
+    calendarGrid += '<div class="calendar-cell empty"></div>';
+  }
+  
+  // Calendar cells for each day of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarGrid += `<div class="calendar-cell">${day}</div>`;
+  }
+  
+  calendarGrid += '</div>';
+  
   return `
     <div class="section-head">
       <div>
         <h3>Calendar</h3>
       </div>
     </div>
-    <div class="empty">
-      <strong>hey there</strong>
-      <div>No events yet. Calendar coming soon.</div>
-    </div>
+    ${calendarGrid}
   `;
 }
 
