@@ -676,6 +676,8 @@ function renderPanel() {
 }
 
 function renderCalendar() {
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const daysArray = Array.from({length: daysInMonth}, (_, i) => i + 1);
   return `
     <div class="section-head">
       <div>
@@ -683,7 +685,7 @@ function renderCalendar() {
       </div>
     </div>
     <div class="calendar-grid">
-      ${Array.from({ length: 30 }).map((_, i) => `<div class='calendar-cell'>${i + 1}</div>`).join('')}
+      ${daysArray.map(day => `<div class="day-box">${day}</div>`).join("")}
     </div>
   `;
 }
