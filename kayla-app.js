@@ -508,7 +508,7 @@ function render() {
         <div class="brand">
           ${appImage(brandGifSrc, "monkey-mark")}
           <div>
-            <h1>Traquea Monos</h1>
+            <h1>Traquea Monos (K)</h1>
             <p>shared progress tracker</p>
           </div>
         </div>
@@ -593,7 +593,7 @@ function renderEmptyApp() {
         <div class="brand">
           ${appImage(brandGifSrc, "monkey-mark")}
           <div>
-            <h1>Traquea Monos</h1>
+            <h1>Traquea Monos (K)</h1>
             <p>shared progress tracker</p>
           </div>
         </div>
