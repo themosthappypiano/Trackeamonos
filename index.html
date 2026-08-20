@@ -119,15 +119,16 @@
         });
 
         document.getElementById(typingId).remove();
+        const data = await response.json().catch(() => ({}));
 
         if (response.ok) {
-          addMessage('✨ Request sent! I am pushing the PR to GitHub now. Render will deploy it shortly.', false);
+          addMessage(data.output || data.message || '✨ Done. The request completed successfully.', false);
         } else {
-          throw new Error('Network response was not ok');
+          throw new Error(data.message || `Workflow failed with status ${response.status}`);
         }
       } catch (error) {
         document.getElementById(typingId)?.remove();
-        addMessage('❌ Error: Could not connect to n8n webhook.', false);
+        addMessage(`❌ ${error.message || 'Could not connect to the AI developer.'}`, false);
       } finally {
         inputField.disabled = false;
         submitBtn.disabled = false;
