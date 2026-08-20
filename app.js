@@ -683,7 +683,7 @@ function renderCalendar() {
       </div>
     </div>
     <div class="empty">
-      <strong>hey there</strong>
+      <strong>hey there — AI Developer online</strong>
       <div>No events yet. Calendar coming soon.</div>
     </div>
   `;
