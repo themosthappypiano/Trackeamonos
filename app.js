@@ -683,48 +683,7 @@ function renderCalendar() {
       </div>
     </div>
     <div class="calendar-grid">
-      <div class="calendar-header">
-        <div>Sun</div>
-        <div>Mon</div>
-        <div>Tue</div>
-        <div>Wed</div>
-        <div>Thu</div>
-        <div>Fri</div>
-        <div>Sat</div>
-      </div>
-      <div class="calendar-body">
-        <div class="calendar-cell">1</div>
-        <div class="calendar-cell">2</div>
-        <div class="calendar-cell">3</div>
-        <div class="calendar-cell">4</div>
-        <div class="calendar-cell">5</div>
-        <div class="calendar-cell">6</div>
-        <div class="calendar-cell">7</div>
-        <div class="calendar-cell">8</div>
-        <div class="calendar-cell">9</div>
-        <div class="calendar-cell">10</div>
-        <div class="calendar-cell">11</div>
-        <div class="calendar-cell">12</div>
-        <div class="calendar-cell">13</div>
-        <div class="calendar-cell">14</div>
-        <div class="calendar-cell">15</div>
-        <div class="calendar-cell">16</div>
-        <div class="calendar-cell">17</div>
-        <div class="calendar-cell">18</div>
-        <div class="calendar-cell">19</div>
-        <div class="calendar-cell">20</div>
-        <div class="calendar-cell">21</div>
-        <div class="calendar-cell">22</div>
-        <div class="calendar-cell">23</div>
-        <div class="calendar-cell">24</div>
-        <div class="calendar-cell">25</div>
-        <div class="calendar-cell">26</div>
-        <div class="calendar-cell">27</div>
-        <div class="calendar-cell">28</div>
-        <div class="calendar-cell">29</div>
-        <div class="calendar-cell">30</div>
-        <div class="calendar-cell">31</div>
-      </div>
+      ${Array.from({ length: 30 }).map((_, i) => `<div class='calendar-cell'>${i + 1}</div>`).join('')}
     </div>
   `;
 }
