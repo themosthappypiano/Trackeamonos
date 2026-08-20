@@ -267,7 +267,7 @@ function uid(prefix) {
 }
 
 function tabLabel(tab) {
-  return { tasks: "Tasks", habits: "Habits", checklist: "Checklist" }[tab];
+  return { tasks: "Tasks", habits: "Habits", checklist: "Checklist", calendar: "Calendar" }[tab];
 }
 
 function normalizeChecklist(items) {
@@ -666,7 +666,7 @@ function renderDailyGif() {
 function renderTabs() {
   return `
     <div class="tab-row">
-      ${["tasks", "habits", "checklist"].map((tab) => `
+      ${["tasks", "habits", "checklist", "calendar"].map((tab) => `
         <button class="tab-button ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">
           ${tabLabel(tab)}
         </button>
@@ -678,7 +678,19 @@ function renderTabs() {
 function renderPanel() {
   if (state.activeTab === "habits") return renderHabits();
   if (state.activeTab === "checklist") return renderChecklist();
+  if (state.activeTab === "calendar") return renderCalendar();
   return renderTasks();
+}
+
+function renderCalendar() {
+  return `
+    <div class="section-head">
+      <div>
+        <h3>Calendar</h3>
+      </div>
+    </div>
+    <div class="empty">No events yet. Calendar coming soon.</div>
+  `;
 }
 
 function closeOpenForms() {
