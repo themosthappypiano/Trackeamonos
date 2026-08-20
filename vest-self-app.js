@@ -429,7 +429,7 @@ async function hydrateFromSupabase() {
     profiles = profiles.filter(profile => {
       const name = (profile.display_name || "").toLowerCase();
       // Hide your girlfriend's profile (luabubu) from Kayla's view
-      return !name.includes("luabubu");
+      return !name.includes("luabubu") && !name.includes("jonashi");
     });
 
     const profileIds = profiles.map((profile) => profile.id);
@@ -516,7 +516,7 @@ function render() {
           ${appImage(brandGifSrc, "monkey-mark")}
           <div>
             <h1>Traquea Monos (K)</h1>
-            <p>shared progress tracker</p>
+            <p>Vest Self</p>
           </div>
         </div>
         <div class="profile-actions">
@@ -601,7 +601,7 @@ function renderEmptyApp() {
           ${appImage(brandGifSrc, "monkey-mark")}
           <div>
             <h1>Traquea Monos (K)</h1>
-            <p>shared progress tracker</p>
+            <p>Vest Self</p>
           </div>
         </div>
         <div class="profile-actions">

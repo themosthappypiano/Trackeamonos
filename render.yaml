@@ -6,6 +6,9 @@ services:
     staticPublishPath: .
     routes:
       - type: rewrite
+        source: /vest-self.html
+        destination: /vest-self.html
+      - type: rewrite
         source: /kayla.html
         destination: /kayla.html
       - type: rewrite
