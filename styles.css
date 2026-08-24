@@ -1276,6 +1276,14 @@ textarea {
   box-shadow: 0 2px 0px var(--ink);
 }
 
+.like-btn:disabled,
+.complain-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 0px var(--ink);
+}
+
 /* Gold coin pile representation */
 .coin-pile {
   position: absolute;

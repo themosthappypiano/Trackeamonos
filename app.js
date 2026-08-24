@@ -9,6 +9,8 @@ const today = () => localDateKey();
 const SUPABASE_URL = "https://kqzwtsqntmusvdzdjhha.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxend0c3FudG11c3ZkemRqaGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDYyNjYsImV4cCI6MjA5OTgyMjI2Nn0.7t7eqkLURQSJv7v7Kv0N7Kmbly_mmVy-e0xePnLsJxY";
 const USE_SUPABASE = true;
+const JAR_CAPACITY = 1.00;
+const JAR_OVERFLOW_PENALTY = 500;
 const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
 const REQUEST_TIMEOUT_MS = 12000;
 const ASSET_TIMEOUT_MS = 5000;
@@ -189,7 +191,8 @@ function mapProfile(row) {
     photo: row.avatar_url || "",
     streak: row.streak_count || 0,
     likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
-    complainJarAmount: row.complain_jar_amount != null ? Number(row.complain_jar_amount) : 0
+    complainJarAmount: row.complain_jar_amount != null ? Number(row.complain_jar_amount) : 0,
+    xpPenalty: row.xp_penalty != null ? Number(row.xp_penalty) : 0
   };
 }
 
@@ -368,7 +371,8 @@ function stats(profileId) {
   const clean = checklist.filter((item) => item.answer === false).length;
   const answered = checklist.filter((item) => item.answer !== null).length;
   const earnedToday = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5;
-  const xp = (state.earnedXp[profileId] || 0) + earnedToday;
+  const xpPenalty = state.profiles.find((p) => p.id === profileId)?.xpPenalty || 0;
+  const xp = Math.max(0, (state.earnedXp[profileId] || 0) + earnedToday - xpPenalty);
   const level = Math.floor(xp / 100) + 1;
   const levelProgress = xp % 100;
   return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: checklist.length, answered, xp, level, levelProgress };
@@ -435,7 +439,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,complain_jar_amount,created_at&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,complain_jar_amount,xp_penalty,created_at&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -886,6 +890,7 @@ function renderOverview(profile) {
     const likeJarAmount = profile.likeJarAmount || 0;
     const pileHeight = Math.min(80, Math.floor(likeJarAmount * 3));
     const pileOpacity = likeJarAmount > 0 ? 0.85 : 0;
+    const likeJarFull = likeJarAmount >= JAR_CAPACITY;
 
     likeJarHtml = `
       <div class="like-jar-card">
@@ -896,8 +901,8 @@ function renderOverview(profile) {
           </div>
         </div>
         <div class="jar-total">€${likeJarAmount.toFixed(2)}</div>
-        <button class="like-btn" data-action="like-jar-hit">
-          👍 She said "Like"
+        <button class="like-btn" data-action="like-jar-hit" ${likeJarFull ? "disabled" : ""}>
+          ${likeJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : `👍 She said "Like"`}
         </button>
         <span class="reset-jar-btn" data-action="like-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
       </div>
@@ -910,6 +915,7 @@ function renderOverview(profile) {
     const complainJarAmount = profile.complainJarAmount || 0;
     const complainPileHeight = Math.min(80, Math.floor(complainJarAmount * 3));
     const complainPileOpacity = complainJarAmount > 0 ? 0.85 : 0;
+    const complainJarFull = complainJarAmount >= JAR_CAPACITY;
 
     complainJarHtml = `
       <div class="complain-jar-card">
@@ -920,8 +926,8 @@ function renderOverview(profile) {
           </div>
         </div>
         <div class="jar-total">€${complainJarAmount.toFixed(2)}</div>
-        <button class="complain-btn" data-action="complain-jar-hit">
-          😤 He complained
+        <button class="complain-btn" data-action="complain-jar-hit" ${complainJarFull ? "disabled" : ""}>
+          ${complainJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : "😤 He complained"}
         </button>
         <span class="reset-jar-btn" data-action="complain-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
       </div>
@@ -1108,10 +1114,14 @@ async function hitLikeJar() {
   if (!profile) return;
 
   const prevAmount = profile.likeJarAmount || 0;
-  const nextAmount = prevAmount + 0.10;
+  if (prevAmount >= JAR_CAPACITY) return;
+  const nextAmount = Math.min(prevAmount + 0.10, JAR_CAPACITY);
+  const justFilled = nextAmount >= JAR_CAPACITY;
+  const nextPenalty = justFilled ? (profile.xpPenalty || 0) + JAR_OVERFLOW_PENALTY : profile.xpPenalty || 0;
 
   // Optimistically update local profile state
-  state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, likeJarAmount: nextAmount } : p);
+  state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, likeJarAmount: nextAmount, xpPenalty: nextPenalty } : p);
+  if (justFilled) notify(`Luabubu's Like Jar is full! -${JAR_OVERFLOW_PENALTY} XP.`);
 
   const jarWrapper = document.querySelector(".jar-wrapper");
   const piggyJar = document.querySelector(".piggy-jar");
@@ -1162,7 +1172,7 @@ async function hitLikeJar() {
     try {
       await supabaseRequest(`profiles?id=eq.${profile.id}`, {
         method: "PATCH",
-        body: { like_jar_amount: nextAmount }
+        body: { like_jar_amount: nextAmount, xp_penalty: nextPenalty }
       });
     } catch (error) {
       console.error("Failed to update Like Jar on Supabase:", error);
@@ -1197,10 +1207,14 @@ async function hitComplainJar() {
   if (!profile) return;
 
   const prevAmount = profile.complainJarAmount || 0;
-  const nextAmount = prevAmount + 0.10;
+  if (prevAmount >= JAR_CAPACITY) return;
+  const nextAmount = Math.min(prevAmount + 0.10, JAR_CAPACITY);
+  const justFilled = nextAmount >= JAR_CAPACITY;
+  const nextPenalty = justFilled ? (profile.xpPenalty || 0) + JAR_OVERFLOW_PENALTY : profile.xpPenalty || 0;
 
   // Optimistically update local profile state
-  state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, complainJarAmount: nextAmount } : p);
+  state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, complainJarAmount: nextAmount, xpPenalty: nextPenalty } : p);
+  if (justFilled) notify(`Jonas's Complaint Jar is full! -${JAR_OVERFLOW_PENALTY} XP.`);
 
   const jarWrapper = document.querySelector(".complain-jar-card .jar-wrapper");
   const piggyJar = document.querySelector(".complain-jar-card .piggy-jar");
@@ -1251,7 +1265,7 @@ async function hitComplainJar() {
     try {
       await supabaseRequest(`profiles?id=eq.${profile.id}`, {
         method: "PATCH",
-        body: { complain_jar_amount: nextAmount }
+        body: { complain_jar_amount: nextAmount, xp_penalty: nextPenalty }
       });
     } catch (error) {
       console.error("Failed to update Complaint Jar on Supabase:", error);
