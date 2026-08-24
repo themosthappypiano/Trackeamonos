@@ -16,20 +16,21 @@
 }
 
 body.dark {
+  color-scheme: dark;
   --bg: #0d1117;
-  --ink: #e6edf3;
-  --muted: #8b949e;
+  --ink: #dbe2e8;
+  --muted: #838d96;
   --panel: #161b22;
   --panel-soft: #1c232c;
   --line: #30363d;
-  --green: #3fb950;
-  --blue: #58a6ff;
-  --red: #f85149;
-  --yellow: #e3b341;
-  --pink: #f778ba;
-  --mint: #56d4a5;
+  --green: #4a9e64;
+  --blue: #6a95d6;
+  --red: #d9695f;
+  --yellow: #cc9f4d;
+  --pink: #cf82a8;
+  --mint: #55b596;
   --sidebar: #0a0d12;
-  --shadow: 8px 8px 0 rgba(0, 0, 0, 0.45);
+  --shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -1070,7 +1071,7 @@ textarea {
   border-width: 4px;
   background:
     linear-gradient(135deg, rgba(244, 184, 59, 0.68), transparent 56%),
-    #ffffff;
+    var(--panel);
   box-shadow: 10px 10px 0 rgba(23, 33, 29, 0.2);
   transform: translate(-50%, 18px) scale(0.96);
 }
@@ -1203,7 +1204,7 @@ textarea {
 .check-item {
   background:
     linear-gradient(135deg, rgba(24, 168, 109, 0.08), transparent 60%),
-    #ffffff;
+    var(--panel);
 }
 
 .check-row button.active.yes,
@@ -1600,13 +1601,54 @@ body.dark .sidebar,
 body.dark .level-card,
 body.dark .add-card,
 body.dark .gratitude-card,
-body.dark .panel-body:has(#check-form),
-body.dark .panel-body:has(.check-item),
-body.dark .panel-body:has(.gratitude-open),
 body.dark .gratitude-modal {
   background-image: linear-gradient(135deg, rgba(63, 185, 80, 0.1), transparent 60%);
 }
 
 body.dark .toast {
   background-image: linear-gradient(135deg, rgba(227, 179, 65, 0.18), transparent 55%);
+}
+
+body.dark .daily-gif {
+  background: rgba(227, 179, 65, 0.12);
+}
+
+body.dark .check-row button.active.yes {
+  background: rgba(217, 105, 95, 0.16);
+}
+
+body.dark .check-row button.active.no,
+body.dark .check-row button.active.yes {
+  background: rgba(74, 158, 100, 0.16);
+  color: var(--green);
+}
+
+body.dark .profile-card.active {
+  box-shadow: 5px 5px 0 rgba(74, 158, 100, 0.22);
+}
+
+body.dark .task-item.in_progress {
+  background-image: linear-gradient(90deg, rgba(106, 149, 214, 0.14), transparent 58%);
+  box-shadow: 5px 5px 0 rgba(106, 149, 214, 0.14);
+}
+
+body.dark .task-item.done {
+  background-image: linear-gradient(90deg, rgba(74, 158, 100, 0.12), transparent 58%);
+  box-shadow: 5px 5px 0 rgba(74, 158, 100, 0.16);
+}
+
+body.dark .xp-card {
+  background-image: linear-gradient(135deg, rgba(204, 159, 77, 0.2), rgba(106, 149, 214, 0.1));
+}
+
+body.dark .panel-body:has(#check-form),
+body.dark .panel-body:has(.check-item),
+body.dark .panel-body:has(.gratitude-open) {
+  background-image:
+    linear-gradient(135deg, rgba(63, 185, 80, 0.1), transparent 60%),
+    radial-gradient(circle at 98% 18%, rgba(74, 158, 100, 0.12), transparent 28%);
+}
+
+body.dark .calendar-search:focus {
+  box-shadow: 0 0 0 3px rgba(74, 158, 100, 0.22);
 }
