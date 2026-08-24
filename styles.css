@@ -785,44 +785,43 @@ textarea {
 
 .folder-list {
   display: grid;
-  gap: 16px;
-}
-
-.folder-card {
-  display: grid;
   gap: 10px;
-  padding: 12px;
-  border: 2px dashed var(--line);
-  border-radius: 10px;
 }
 
-.folder-card-head {
+.folder-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
+  gap: 10px;
+  padding: 14px 14px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 4px 4px 0 rgba(23, 33, 29, 0.09);
   border-left: 6px solid var(--folder-color, var(--green));
-  padding-left: 10px;
   touch-action: pan-y;
-  cursor: grab;
+  cursor: pointer;
 }
 
-.folder-card-head.dragging {
+.folder-row:hover {
+  transform: translateX(2px);
+}
+
+.folder-row.dragging {
   opacity: 0.82;
   cursor: grabbing;
   z-index: 2;
 }
 
-.folder-card-head.static {
-  cursor: default;
+.folder-row.static {
   border-left-color: var(--muted);
-  opacity: 0.75;
+  opacity: 0.85;
 }
 
 .drag-handle {
   color: var(--muted);
   font-size: 16px;
   line-height: 1;
+  cursor: grab;
 }
 
 .folder-count {
@@ -830,6 +829,12 @@ textarea {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.folder-arrow {
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 900;
 }
 
 .status-dot {

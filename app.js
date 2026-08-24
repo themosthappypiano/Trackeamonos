@@ -22,6 +22,7 @@ let dailyGifSrc = DEFAULT_GIF_SRC;
 let syncInFlight = false;
 let taskReorderInFlight = false;
 let lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
+let lastDragMoveEndAt = 0;
 
 const seed = {
   loading: USE_SUPABASE,
@@ -33,6 +34,7 @@ const seed = {
   habitFormOpen: false,
   checkFormOpen: false,
   folderFormOpen: false,
+  openFolderId: null,
   gratitudeOpen: false,
   profiles: [],
   tasks: [],
@@ -754,7 +756,7 @@ function renderCalendar() {
 }
 
 function closeOpenForms() {
-  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false };
+  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false, openFolderId: null };
 }
 
 function renderTaskItem(task) {
@@ -786,15 +788,41 @@ function renderTasks() {
   const folders = byProfile(state.folders).sort(compareTasks);
   const unfiledTasks = tasks.filter((task) => !task.folderId || !folders.some((folder) => folder.id === task.folderId));
 
+  const openFolder = state.openFolderId === "unfiled"
+    ? { id: "unfiled", name: "Unfiled" }
+    : folders.find((folder) => folder.id === state.openFolderId);
+
+  if (openFolder) {
+    const folderTasks = openFolder.id === "unfiled" ? unfiledTasks : tasks.filter((task) => task.folderId === openFolder.id);
+    return `
+      <div class="section-head">
+        <div>
+          <button class="pill-button" data-action="close-folder">← Folders</button>
+          <h3>${escapeHtml(openFolder.name)}</h3>
+        </div>
+        <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
+      </div>
+      ${state.taskFormOpen ? `
+        <form class="add-card" id="task-form">
+          <input id="task-title" placeholder="Task name" required />
+          <textarea id="task-description" placeholder="Description optional"></textarea>
+          <input id="task-date" type="date" value="${today()}" />
+          <input type="hidden" id="task-folder" value="${openFolder.id === "unfiled" ? "" : openFolder.id}" />
+          <button class="pill-button primary" type="submit">Create</button>
+        </form>
+      ` : ""}
+      <div class="item-list">
+        ${folderTasks.length ? folderTasks.map(renderTaskItem).join("") : `<div class="empty">No tasks in this folder yet.</div>`}
+      </div>
+    `;
+  }
+
   return `
     <div class="section-head">
       <div>
         <h3>Tasks</h3>
       </div>
-      <div class="section-head-actions">
-        <button class="pill-button" data-action="toggle-folder-form">+ Add folder</button>
-        <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
-      </div>
+      <button class="pill-button primary" data-action="toggle-folder-form">+ Add folder</button>
     </div>
     ${state.folderFormOpen ? `
       <form class="add-card two" id="folder-form">
@@ -803,48 +831,28 @@ function renderTasks() {
         <button class="pill-button primary" type="submit">Create</button>
       </form>
     ` : ""}
-    ${state.taskFormOpen ? `
-      <form class="add-card" id="task-form">
-        <input id="task-title" placeholder="Task name" required />
-        <textarea id="task-description" placeholder="Description optional"></textarea>
-        <input id="task-date" type="date" value="${today()}" />
-        <select id="task-folder">
-          <option value="">No folder</option>
-          ${folders.map((folder) => `<option value="${folder.id}">${escapeHtml(folder.name)}</option>`).join("")}
-        </select>
-        <button class="pill-button primary" type="submit">Create</button>
-      </form>
-    ` : ""}
     ${folders.length || unfiledTasks.length ? `
       <div class="folder-list">
         ${folders.map((folder) => {
           const folderTasks = tasks.filter((task) => task.folderId === folder.id);
           return `
-            <section class="folder-card">
-              <div class="folder-card-head" data-drag-kind="folders" data-drag-id="${folder.id}" data-drag-scope="folders" data-delete-kind="folders" data-delete-id="${folder.id}" style="--folder-color:${folder.color || "#44bba4"}">
-                <span class="drag-handle">⠿</span>
-                <strong>${escapeHtml(folder.name)}</strong>
-                <span class="folder-count">${folderTasks.length} task${folderTasks.length === 1 ? "" : "s"}</span>
-              </div>
-              <div class="item-list">
-                ${folderTasks.length ? folderTasks.map(renderTaskItem).join("") : `<div class="empty">No tasks in this folder yet.</div>`}
-              </div>
-            </section>
+            <div class="folder-row" data-drag-kind="folders" data-drag-id="${folder.id}" data-drag-scope="folders" data-delete-kind="folders" data-delete-id="${folder.id}" data-open-folder="${folder.id}" style="--folder-color:${folder.color || "#44bba4"}">
+              <span class="drag-handle">⠿</span>
+              <strong>${escapeHtml(folder.name)}</strong>
+              <span class="folder-count">${folderTasks.length} task${folderTasks.length === 1 ? "" : "s"}</span>
+              <span class="folder-arrow">›</span>
+            </div>
           `;
         }).join("")}
         ${unfiledTasks.length ? `
-          <section class="folder-card unfiled">
-            <div class="folder-card-head static">
-              <strong>Unfiled</strong>
-              <span class="folder-count">${unfiledTasks.length} task${unfiledTasks.length === 1 ? "" : "s"}</span>
-            </div>
-            <div class="item-list">
-              ${unfiledTasks.map(renderTaskItem).join("")}
-            </div>
-          </section>
+          <div class="folder-row static" data-open-folder="unfiled">
+            <strong>Unfiled</strong>
+            <span class="folder-count">${unfiledTasks.length} task${unfiledTasks.length === 1 ? "" : "s"}</span>
+            <span class="folder-arrow">›</span>
+          </div>
         ` : ""}
       </div>
-    ` : `<div class="empty">No active tasks. Future tasks will show on their date.</div>`}
+    ` : `<div class="empty">No folders yet. Add one to start organizing your tasks.</div>`}
   `;
 }
 
@@ -1087,6 +1095,13 @@ function bindEvents() {
     node.addEventListener("pointerdown", startDrag);
   });
 
+  document.querySelectorAll("[data-open-folder]").forEach((node) => {
+    node.addEventListener("click", () => {
+      if (Date.now() - lastDragMoveEndAt < 300) return;
+      setState({ openFolderId: node.dataset.openFolder });
+    });
+  });
+
   document.querySelectorAll("[data-task-status]").forEach((node) => {
     node.addEventListener("click", () => {
       const [id, status] = node.dataset.taskStatus.split(":");
@@ -1159,6 +1174,7 @@ function handleAction(action) {
   if (action === "toggle-settings") setState({ settingsOpen: !state.settingsOpen });
   if (action === "toggle-task-form") setState({ taskFormOpen: !state.taskFormOpen });
   if (action === "toggle-folder-form") setState({ folderFormOpen: !state.folderFormOpen });
+  if (action === "close-folder") setState({ openFolderId: null, taskFormOpen: false });
   if (action === "toggle-habit-form") setState({ habitFormOpen: !state.habitFormOpen });
   if (action === "toggle-check-form") setState({ checkFormOpen: !state.checkFormOpen });
   if (action === "open-gratitude") setState({ gratitudeOpen: true });
@@ -1616,6 +1632,7 @@ async function deleteItem(kind, id) {
   state[collectionName] = state[collectionName].filter((item) => item.id !== id);
   if (kind === "folders") {
     state.tasks = state.tasks.map((task) => task.folderId === id ? { ...task, folderId: null } : task);
+    if (state.openFolderId === id) state.openFolderId = null;
   }
   saveState();
   render();
@@ -1718,6 +1735,7 @@ function endDrag(event) {
   const finalY = event.clientY;
   dragState = null;
   if (!moved) return;
+  lastDragMoveEndAt = Date.now();
 
   const others = siblingOrder.filter((entry) => entry.id !== id);
   const targetIndex = others.filter((entry) => entry.center < finalY).length;
