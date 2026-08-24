@@ -36,6 +36,7 @@ const seed = {
   folderFormOpen: false,
   openFolderId: null,
   gratitudeOpen: false,
+  calendarSearch: "",
   profiles: [],
   tasks: [],
   folders: [],
@@ -706,6 +707,28 @@ function renderPanel() {
   return renderTasks();
 }
 
+function renderCalendarGroup(title, daysArray, dateKeyForDay, todayDate, isMetFn) {
+  let daysMet = 0;
+  const dayCells = daysArray.map((day) => {
+    const dateKey = dateKeyForDay(day);
+    const met = isMetFn(dateKey);
+    const isFuture = day > todayDate;
+    if (met) daysMet += 1;
+    const cls = isFuture ? "calendar-day future" : met ? "calendar-day met" : "calendar-day";
+    return `<div class="${cls}" title="${dateKey}">${day}</div>`;
+  }).join("");
+
+  return `
+    <article class="calendar-habit">
+      <div class="calendar-habit-head">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${daysMet}/${daysArray.length} days this month</span>
+      </div>
+      <div class="calendar-day-grid">${dayCells}</div>
+    </article>
+  `;
+}
+
 function renderCalendar() {
   const now = new Date();
   const year = now.getFullYear();
@@ -714,33 +737,33 @@ function renderCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayDate = now.getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const dateKeyForDay = (day) => `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-  const habits = byProfile(state.habits).sort(compareItems);
+  const query = (state.calendarSearch || "").trim().toLowerCase();
+  const habits = byProfile(state.habits).sort(compareItems)
+    .filter((habit) => !query || habit.title.toLowerCase().includes(query));
   const habitLogs = (state.habitLogs || []).filter((log) => activeProfile() && log.profileId === activeProfile().id);
 
   const habitRows = habits.map((habit) => {
     const logsForHabit = habitLogs.filter((log) => log.habitId === habit.id);
-    let daysMet = 0;
-    const dayCells = daysArray.map((day) => {
-      const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return renderCalendarGroup(habit.title, daysArray, dateKeyForDay, todayDate, (dateKey) => {
       const log = logsForHabit.find((item) => item.date === dateKey);
-      const met = (log?.count || 0) >= habit.target;
-      const isFuture = day > todayDate;
-      if (met) daysMet += 1;
-      const cls = isFuture ? "calendar-day future" : met ? "calendar-day met" : "calendar-day";
-      return `<div class="${cls}" title="${dateKey}">${day}</div>`;
-    }).join("");
-
-    return `
-      <article class="calendar-habit">
-        <div class="calendar-habit-head">
-          <strong>${escapeHtml(habit.title)}</strong>
-          <span>${daysMet}/${daysInMonth} days this month</span>
-        </div>
-        <div class="calendar-day-grid">${dayCells}</div>
-      </article>
-    `;
+      return (log?.count || 0) >= habit.target;
+    });
   }).join("");
+
+  let taskRows = "";
+  if (query) {
+    const matchingTasks = byProfile(state.tasks).filter((task) => task.title.toLowerCase().includes(query));
+    const taskTitles = [...new Set(matchingTasks.map((task) => task.title))];
+    taskRows = taskTitles.map((title) => {
+      const tasksWithTitle = matchingTasks.filter((task) => task.title === title);
+      return renderCalendarGroup(title, daysArray, dateKeyForDay, todayDate, (dateKey) => tasksWithTitle
+        .some((task) => task.status === "done" && taskCompletedDate(task) === dateKey));
+    }).join("");
+  }
+
+  const hasResults = habitRows || taskRows;
 
   return `
     <div class="section-head">
@@ -749,9 +772,12 @@ function renderCalendar() {
         <span>${monthLabel}</span>
       </div>
     </div>
-    ${habits.length
-      ? `<div class="calendar-habit-list">${habitRows}</div>`
-      : `<div class="empty">No habits yet. Add one in the Habits tab to see it here.</div>`}
+    <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit or task…" value="${escapeHtml(state.calendarSearch || "")}" />
+    ${hasResults
+      ? `<div class="calendar-habit-list">${habitRows}${taskRows}</div>`
+      : query
+        ? `<div class="empty">No habit or task matches "${escapeHtml(state.calendarSearch)}".</div>`
+        : `<div class="empty">No habits yet. Add one in the Habits tab to see it here.</div>`}
   `;
 }
 
@@ -1166,6 +1192,20 @@ function bindEvents() {
 
   const checkForm = document.querySelector("#check-form");
   if (checkForm) checkForm.addEventListener("submit", addChecklist);
+
+  const calendarSearch = document.querySelector("#calendar-search");
+  if (calendarSearch) {
+    calendarSearch.addEventListener("input", () => {
+      const caret = calendarSearch.selectionStart;
+      state.calendarSearch = calendarSearch.value;
+      render();
+      const nextInput = document.querySelector("#calendar-search");
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.setSelectionRange(caret, caret);
+      }
+    });
+  }
 }
 
 function handleAction(action) {

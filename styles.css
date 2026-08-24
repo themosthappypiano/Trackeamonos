@@ -636,6 +636,17 @@ textarea {
   text-align: center;
 }
 
+.calendar-search {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .calendar-habit-list {
   display: grid;
   gap: 14px;
