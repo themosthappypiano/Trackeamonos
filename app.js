@@ -32,9 +32,11 @@ const seed = {
   taskFormOpen: false,
   habitFormOpen: false,
   checkFormOpen: false,
+  folderFormOpen: false,
   gratitudeOpen: false,
   profiles: [],
   tasks: [],
+  folders: [],
   habits: [],
   habitLogs: [],
   checklist: [],
@@ -205,7 +207,19 @@ function mapTask(row) {
     date: row.task_date,
     status: row.status,
     sortOrder: row.sort_order == null ? null : Number(row.sort_order),
+    folderId: row.folder_id || null,
     completedAt: row.completed_at || null,
+    createdAt: row.created_at
+  };
+}
+
+function mapFolder(row) {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    name: row.name,
+    color: row.color,
+    sortOrder: row.sort_order == null ? null : Number(row.sort_order),
     createdAt: row.created_at
   };
 }
@@ -323,7 +337,8 @@ function tableForKind(kind) {
   return {
     tasks: "tasks",
     habits: "habits",
-    checklist: "checklist_items"
+    checklist: "checklist_items",
+    folders: "task_folders"
   }[kind];
 }
 
@@ -331,18 +346,9 @@ function collectionForKind(kind) {
   return {
     tasks: "tasks",
     habits: "habits",
-    checklist: "checklist"
+    checklist: "checklist",
+    folders: "folders"
   }[kind];
-}
-
-function visibleItemsForKind(kind) {
-  const profile = activeProfile();
-  if (!profile) return [];
-  const collection = state[collectionForKind(kind)] || [];
-  return collection
-    .filter((item) => item.profileId === profile.id)
-    .filter((item) => kind !== "tasks" || isTaskVisibleToday(item))
-    .sort(kind === "tasks" ? compareTasks : compareItems);
 }
 
 let dragState = null;
@@ -443,15 +449,16 @@ async function hydrateFromSupabase() {
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
-      state = { ...state, loading: false, profiles: [], tasks: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
+      state = { ...state, loading: false, profiles: [], tasks: [], folders: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
       saveState();
       render();
       notify("Supabase connected. No profiles yet.");
       return;
     }
     const idFilter = `(${profileIds.join(",")})`;
-    const [tasks, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
-      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,created_at,completed_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
+    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
+      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
+      supabaseRequest("task_folders", { query: `?select=id,profile_id,name,color,sort_order,created_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
       supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
       supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
@@ -467,6 +474,7 @@ async function hydrateFromSupabase() {
       ...state,
       profiles: profiles.map(mapProfile),
       tasks: tasks.map(mapTask),
+      folders: folders.map(mapFolder),
       habits: habits.map((habit) => mapHabit(habit, habitLogs.filter((log) => log.log_date === today()))),
       habitLogs: habitLogs.map(mapHabitLog),
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
@@ -479,6 +487,7 @@ async function hydrateFromSupabase() {
     const changed = JSON.stringify({
       profiles: state.profiles,
       tasks: state.tasks,
+      folders: state.folders,
       habits: state.habits,
       habitLogs: state.habitLogs,
       checklist: state.checklist,
@@ -487,6 +496,7 @@ async function hydrateFromSupabase() {
     }) !== JSON.stringify({
       profiles: nextState.profiles,
       tasks: nextState.tasks,
+      folders: nextState.folders,
       habits: nextState.habits,
       habitLogs: nextState.habitLogs,
       checklist: nextState.checklist,
@@ -744,43 +754,97 @@ function renderCalendar() {
 }
 
 function closeOpenForms() {
-  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false };
+  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false };
+}
+
+function renderTaskItem(task) {
+  return `
+    <article class="task-item ${task.status}" data-delete-kind="tasks" data-delete-id="${task.id}" data-drag-kind="tasks" data-drag-id="${task.id}" data-drag-scope="tasks-${task.folderId || "unfiled"}">
+      <div class="item-title">
+        <strong>${escapeHtml(task.title)}</strong>
+        ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
+        ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ""}
+      </div>
+      <div class="task-actions">
+        <select class="task-folder-select" data-task-folder="${task.id}" title="Move to folder">
+          <option value="">No folder</option>
+          ${byProfile(state.folders).sort(compareTasks).map((folder) => `
+            <option value="${folder.id}" ${folder.id === task.folderId ? "selected" : ""}>${escapeHtml(folder.name)}</option>
+          `).join("")}
+        </select>
+        <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
+        <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
+      </div>
+    </article>
+  `;
 }
 
 function renderTasks() {
   const tasks = byProfile(state.tasks)
     .filter(isTaskVisibleToday)
     .sort(compareTasks);
+  const folders = byProfile(state.folders).sort(compareTasks);
+  const unfiledTasks = tasks.filter((task) => !task.folderId || !folders.some((folder) => folder.id === task.folderId));
+
   return `
     <div class="section-head">
       <div>
         <h3>Tasks</h3>
       </div>
-      <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
+      <div class="section-head-actions">
+        <button class="pill-button" data-action="toggle-folder-form">+ Add folder</button>
+        <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
+      </div>
     </div>
+    ${state.folderFormOpen ? `
+      <form class="add-card two" id="folder-form">
+        <input id="folder-name" placeholder="Folder name (e.g. Work, Health, Home)" required />
+        <input id="folder-color" type="color" value="#44bba4" />
+        <button class="pill-button primary" type="submit">Create</button>
+      </form>
+    ` : ""}
     ${state.taskFormOpen ? `
       <form class="add-card" id="task-form">
         <input id="task-title" placeholder="Task name" required />
         <textarea id="task-description" placeholder="Description optional"></textarea>
         <input id="task-date" type="date" value="${today()}" />
+        <select id="task-folder">
+          <option value="">No folder</option>
+          ${folders.map((folder) => `<option value="${folder.id}">${escapeHtml(folder.name)}</option>`).join("")}
+        </select>
         <button class="pill-button primary" type="submit">Create</button>
       </form>
     ` : ""}
-    <div class="item-list">
-      ${tasks.length ? tasks.map((task) => `
-        <article class="task-item ${task.status}" data-delete-kind="tasks" data-delete-id="${task.id}" data-drag-kind="tasks" data-drag-id="${task.id}">
-          <div class="item-title">
-            <strong>${escapeHtml(task.title)}</strong>
-            ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
-            ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ""}
-          </div>
-          <div class="task-actions">
-            <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
-            <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
-          </div>
-        </article>
-      `).join("") : `<div class="empty">No active tasks. Future tasks will show on their date.</div>`}
-    </div>
+    ${folders.length || unfiledTasks.length ? `
+      <div class="folder-list">
+        ${folders.map((folder) => {
+          const folderTasks = tasks.filter((task) => task.folderId === folder.id);
+          return `
+            <section class="folder-card">
+              <div class="folder-card-head" data-drag-kind="folders" data-drag-id="${folder.id}" data-drag-scope="folders" data-delete-kind="folders" data-delete-id="${folder.id}" style="--folder-color:${folder.color || "#44bba4"}">
+                <span class="drag-handle">⠿</span>
+                <strong>${escapeHtml(folder.name)}</strong>
+                <span class="folder-count">${folderTasks.length} task${folderTasks.length === 1 ? "" : "s"}</span>
+              </div>
+              <div class="item-list">
+                ${folderTasks.length ? folderTasks.map(renderTaskItem).join("") : `<div class="empty">No tasks in this folder yet.</div>`}
+              </div>
+            </section>
+          `;
+        }).join("")}
+        ${unfiledTasks.length ? `
+          <section class="folder-card unfiled">
+            <div class="folder-card-head static">
+              <strong>Unfiled</strong>
+              <span class="folder-count">${unfiledTasks.length} task${unfiledTasks.length === 1 ? "" : "s"}</span>
+            </div>
+            <div class="item-list">
+              ${unfiledTasks.map(renderTaskItem).join("")}
+            </div>
+          </section>
+        ` : ""}
+      </div>
+    ` : `<div class="empty">No active tasks. Future tasks will show on their date.</div>`}
   `;
 }
 
@@ -805,7 +869,7 @@ function renderHabits() {
       ${habits.length ? habits.map((habit) => {
         const pct = Math.min(100, Math.round(habit.count / habit.target * 100));
         return `
-          <article class="habit-item" data-delete-kind="habits" data-delete-id="${habit.id}" data-drag-kind="habits" data-drag-id="${habit.id}">
+          <article class="habit-item" data-delete-kind="habits" data-delete-id="${habit.id}" data-drag-kind="habits" data-drag-id="${habit.id}" data-drag-scope="habits">
             <div class="item-title">
               <strong>${escapeHtml(habit.title)}</strong>
               <span>${habit.count}/${habit.target} today</span>
@@ -841,7 +905,7 @@ function renderChecklist() {
     ` : ""}
     <div class="item-list">
       ${checks.length ? checks.map((item) => `
-        <article class="check-item" data-delete-kind="checklist" data-delete-id="${item.id}" data-drag-kind="checklist" data-drag-id="${item.id}">
+        <article class="check-item" data-delete-kind="checklist" data-delete-id="${item.id}" data-drag-kind="checklist" data-drag-id="${item.id}" data-drag-scope="checklist">
           <div class="item-title">
             <strong>${escapeHtml(item.prompt)}</strong>
             <span>${item.answer === null ? "Not logged yet" : item.answer ? "Confirmed" : "Not today"}</span>
@@ -1075,6 +1139,13 @@ function bindEvents() {
   const taskForm = document.querySelector("#task-form");
   if (taskForm) taskForm.addEventListener("submit", addTask);
 
+  const folderForm = document.querySelector("#folder-form");
+  if (folderForm) folderForm.addEventListener("submit", addFolder);
+
+  document.querySelectorAll("[data-task-folder]").forEach((node) => {
+    node.addEventListener("change", () => moveTaskToFolder(node.dataset.taskFolder, node.value));
+  });
+
   const habitForm = document.querySelector("#habit-form");
   if (habitForm) habitForm.addEventListener("submit", addHabit);
 
@@ -1087,6 +1158,7 @@ function handleAction(action) {
   if (action === "close-sidebar") setState({ sidebarOpen: false });
   if (action === "toggle-settings") setState({ settingsOpen: !state.settingsOpen });
   if (action === "toggle-task-form") setState({ taskFormOpen: !state.taskFormOpen });
+  if (action === "toggle-folder-form") setState({ folderFormOpen: !state.folderFormOpen });
   if (action === "toggle-habit-form") setState({ habitFormOpen: !state.habitFormOpen });
   if (action === "toggle-check-form") setState({ checkFormOpen: !state.checkFormOpen });
   if (action === "open-gratitude") setState({ gratitudeOpen: true });
@@ -1302,12 +1374,13 @@ async function addTask(event) {
   const title = document.querySelector("#task-title").value.trim();
   const description = (document.querySelector("#task-description")?.value || "").trim();
   const date = document.querySelector("#task-date").value || today();
+  const folderId = document.querySelector("#task-folder")?.value || null;
   if (!title) return;
   const profile = activeProfile();
   const nextSortOrder = Math.max(0, ...state.tasks
     .filter((item) => item.profileId === profile.id && Number.isInteger(item.sortOrder))
     .map((item) => item.sortOrder)) + 1;
-  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", sortOrder: nextSortOrder, completedAt: null, createdAt: new Date().toISOString() };
+  let task = { id: uid("task"), profileId: profile.id, title, description, date, status: "ready", sortOrder: nextSortOrder, folderId, completedAt: null, createdAt: new Date().toISOString() };
   if (isUuid(profile.id)) {
     try {
       const rows = await supabaseRequest("tasks", {
@@ -1317,7 +1390,8 @@ async function addTask(event) {
           title,
           description,
           task_date: date,
-          status: "ready"
+          status: "ready",
+          folder_id: isUuid(folderId) ? folderId : null
         }
       });
       task = mapTask(rows[0]);
@@ -1331,6 +1405,60 @@ async function addTask(event) {
   saveState();
   render();
   notify(date > today() ? "Future task saved. It will appear on that day." : "Task added.");
+}
+
+async function addFolder(event) {
+  event.preventDefault();
+  const name = document.querySelector("#folder-name").value.trim();
+  const color = document.querySelector("#folder-color")?.value || "#44bba4";
+  if (!name) return;
+  const profile = activeProfile();
+  const nextSortOrder = Math.max(0, ...state.folders
+    .filter((item) => item.profileId === profile.id && Number.isInteger(item.sortOrder))
+    .map((item) => item.sortOrder)) + 1;
+  let folder = { id: uid("folder"), profileId: profile.id, name, color, sortOrder: nextSortOrder, createdAt: new Date().toISOString() };
+  if (isUuid(profile.id)) {
+    try {
+      const rows = await supabaseRequest("task_folders", {
+        method: "POST",
+        body: {
+          profile_id: profile.id,
+          name,
+          color,
+          sort_order: nextSortOrder
+        }
+      });
+      folder = mapFolder(rows[0]);
+    } catch (error) {
+      console.error(error);
+      notify("Folder saved locally. Supabase failed.");
+    }
+  }
+  state.folders.push(folder);
+  state.folderFormOpen = false;
+  saveState();
+  render();
+  notify("Folder added.");
+}
+
+async function moveTaskToFolder(taskId, folderId) {
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  const nextFolderId = folderId || null;
+  if (task.folderId === nextFolderId) return;
+  state.tasks = state.tasks.map((item) => item.id === taskId ? { ...item, folderId: nextFolderId } : item);
+  saveState();
+  render();
+  if (!isUuid(taskId)) return;
+  try {
+    await supabaseRequest(`tasks?id=eq.${taskId}`, {
+      method: "PATCH",
+      body: { folder_id: isUuid(nextFolderId) ? nextFolderId : null }
+    });
+  } catch (error) {
+    console.error(error);
+    notify("Supabase failed to save the folder change.");
+  }
 }
 
 async function addHabit(event) {
@@ -1486,6 +1614,9 @@ async function deleteItem(kind, id) {
   if (!window.confirm("Delete this item?")) return;
 
   state[collectionName] = state[collectionName].filter((item) => item.id !== id);
+  if (kind === "folders") {
+    state.tasks = state.tasks.map((task) => task.folderId === id ? { ...task, folderId: null } : task);
+  }
   saveState();
   render();
   notify("Item deleted.");
@@ -1513,6 +1644,7 @@ async function deleteProfile(id) {
     ...state,
     profiles: remainingProfiles,
     tasks: state.tasks.filter((item) => item.profileId !== id),
+    folders: state.folders.filter((item) => item.profileId !== id),
     habits: state.habits.filter((item) => item.profileId !== id),
     checklist: state.checklist.filter((item) => item.profileId !== id),
     gratitude: state.gratitude.filter((item) => item.profileId !== id),
@@ -1540,13 +1672,24 @@ async function deleteProfile(id) {
 
 function startDrag(event) {
   if (taskReorderInFlight && event.currentTarget.dataset.dragKind === "tasks") return;
-  if (event.target.closest("button, input, textarea, label")) return;
+  if (event.target.closest("button, input, textarea, label, select")) return;
   const node = event.currentTarget;
+  const kind = node.dataset.dragKind;
+  const scope = node.dataset.dragScope || "";
+  const siblings = Array.from(document.querySelectorAll(
+    `[data-drag-kind="${kind}"][data-drag-scope="${scope}"]`
+  ));
+  const siblingOrder = siblings.map((el) => {
+    const rect = el.getBoundingClientRect();
+    return { id: el.dataset.dragId, center: rect.top + rect.height / 2 };
+  });
   dragState = {
-    kind: node.dataset.dragKind,
+    kind,
     id: node.dataset.dragId,
+    scope,
     startY: event.clientY,
-    moved: false
+    moved: false,
+    siblingOrder
   };
   node.classList.add("dragging");
   node.setPointerCapture(event.pointerId);
@@ -1558,8 +1701,8 @@ function startDrag(event) {
 function dragMove(event) {
   if (!dragState) return;
   const distance = event.clientY - dragState.startY;
-  event.currentTarget.style.transform = `translateY(${Math.max(-80, Math.min(80, distance))}px)`;
-  dragState.moved = Math.abs(distance) > 24;
+  event.currentTarget.style.transform = `translateY(${distance}px)`;
+  dragState.moved = Math.abs(distance) > 12;
 }
 
 function endDrag(event) {
@@ -1571,37 +1714,38 @@ function endDrag(event) {
   node.removeEventListener("pointercancel", endDrag);
 
   if (!dragState) return;
-  const distance = event.clientY - dragState.startY;
-  const direction = Math.abs(distance) < 24 ? 0 : Math.sign(distance);
-  const { kind, id, moved } = dragState;
+  const { kind, id, moved, siblingOrder } = dragState;
+  const finalY = event.clientY;
   dragState = null;
-  if (moved && direction) moveItem(kind, id, direction);
+  if (!moved) return;
+
+  const others = siblingOrder.filter((entry) => entry.id !== id);
+  const targetIndex = others.filter((entry) => entry.center < finalY).length;
+  const orderedIds = others.map((entry) => entry.id);
+  orderedIds.splice(targetIndex, 0, id);
+  moveItemTo(kind, orderedIds);
 }
 
-async function moveItem(kind, id, delta) {
+async function moveItemTo(kind, orderedIds) {
   const collectionName = collectionForKind(kind);
   if (!collectionName) return;
 
-  const visible = visibleItemsForKind(kind);
-  const index = visible.findIndex((item) => item.id === id);
-  const nextIndex = index + delta;
-  if (index < 0 || nextIndex < 0 || nextIndex >= visible.length) return;
-
-  const reordered = [...visible];
-  const [item] = reordered.splice(index, 1);
-  reordered.splice(nextIndex, 0, item);
+  const reordered = orderedIds
+    .map((itemId) => state[collectionName].find((item) => item.id === itemId))
+    .filter(Boolean);
+  if (reordered.length < 2) return;
 
   if (kind === "tasks") {
     const profileId = activeProfile()?.id;
     if (!profileId) return;
     const previousTasks = state.tasks.map((task) => ({ ...task }));
-    const reorderedVisibleIds = reordered.map((entry) => entry.id);
-    let visibleIndex = 0;
+    const reorderedIds = reordered.map((entry) => entry.id);
+    let scopedIndex = 0;
     const fullOrder = state.tasks
       .filter((task) => task.profileId === profileId)
       .sort(compareTasks)
-      .map((task) => reorderedVisibleIds.includes(task.id)
-        ? reordered[visibleIndex++]
+      .map((task) => reorderedIds.includes(task.id)
+        ? reordered[scopedIndex++]
         : task);
 
     const sortOrderById = new Map(fullOrder.map((task, order) => [task.id, order + 1]));
@@ -1623,6 +1767,34 @@ async function moveItem(kind, id, delta) {
       notify("Task order could not be saved. The previous order was restored.");
     } finally {
       taskReorderInFlight = false;
+    }
+    return;
+  }
+
+  if (kind === "folders") {
+    const previousFolders = state.folders.map((folder) => ({ ...folder }));
+    const sortOrderById = new Map(reordered.map((folder, order) => [folder.id, order + 1]));
+    state.folders = state.folders.map((folder) => sortOrderById.has(folder.id)
+      ? { ...folder, sortOrder: sortOrderById.get(folder.id) }
+      : folder);
+    saveState();
+    render();
+
+    try {
+      await Promise.all(reordered
+        .filter((folder) => isUuid(folder.id))
+        .map((folder, order) => supabaseRequest("task_folders", {
+          method: "PATCH",
+          query: `?id=eq.${folder.id}`,
+          body: { sort_order: order + 1 }
+        })));
+      notify("Folder order saved.");
+    } catch (error) {
+      console.error(error);
+      state.folders = previousFolders;
+      saveState();
+      render();
+      notify("Folder order could not be saved. The previous order was restored.");
     }
     return;
   }

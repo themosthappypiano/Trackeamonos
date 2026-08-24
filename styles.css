@@ -761,7 +761,75 @@ textarea {
 .task-actions {
   display: flex;
   gap: 10px;
+  align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.task-folder-select {
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.section-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.folder-list {
+  display: grid;
+  gap: 16px;
+}
+
+.folder-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+}
+
+.folder-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-left: 6px solid var(--folder-color, var(--green));
+  padding-left: 10px;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.folder-card-head.dragging {
+  opacity: 0.82;
+  cursor: grabbing;
+  z-index: 2;
+}
+
+.folder-card-head.static {
+  cursor: default;
+  border-left-color: var(--muted);
+  opacity: 0.75;
+}
+
+.drag-handle {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.folder-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .status-dot {
