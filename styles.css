@@ -16,20 +16,20 @@
 }
 
 body.dark {
-  --bg: #10231a;
-  --ink: #eef7f0;
-  --muted: #9db3a6;
-  --panel: #172e22;
-  --panel-soft: #1c3527;
-  --line: #2d4a3a;
-  --green: #2fd996;
-  --blue: #5b9dff;
-  --red: #ff7a63;
-  --yellow: #ffcc5c;
-  --pink: #ff9ec4;
-  --mint: #6fe0bb;
-  --sidebar: #12261c;
-  --shadow: 8px 8px 0 rgba(0, 0, 0, 0.35);
+  --bg: #0d1117;
+  --ink: #e6edf3;
+  --muted: #8b949e;
+  --panel: #161b22;
+  --panel-soft: #1c232c;
+  --line: #30363d;
+  --green: #3fb950;
+  --blue: #58a6ff;
+  --red: #f85149;
+  --yellow: #e3b341;
+  --pink: #f778ba;
+  --mint: #56d4a5;
+  --sidebar: #0a0d12;
+  --shadow: 8px 8px 0 rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -52,9 +52,9 @@ body {
 
 body.dark {
   background:
-    linear-gradient(135deg, rgba(47, 217, 150, 0.14), transparent 34%),
-    linear-gradient(225deg, rgba(47, 217, 150, 0.08), transparent 30%),
-    radial-gradient(circle at 52% 20%, rgba(255, 255, 255, 0.04), transparent 24%),
+    linear-gradient(135deg, rgba(63, 185, 80, 0.08), transparent 34%),
+    linear-gradient(225deg, rgba(88, 166, 255, 0.05), transparent 30%),
+    radial-gradient(circle at 52% 20%, rgba(255, 255, 255, 0.03), transparent 24%),
     var(--bg);
 }
 
@@ -97,7 +97,7 @@ button {
   aspect-ratio: 1;
   border: 3px solid var(--line);
   border-radius: 28px;
-  background: #ffffff;
+  background: var(--panel);
   object-fit: cover;
   box-shadow: var(--shadow);
 }
@@ -169,7 +169,7 @@ button {
   height: 74px;
   border: 2px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   object-fit: cover;
 }
 
@@ -282,7 +282,7 @@ button {
   padding: 10px;
   border: 2px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--panel);
   color: var(--ink);
   text-align: left;
   box-shadow: none;
@@ -291,7 +291,7 @@ button {
 
 .profile-card.active {
   border-color: var(--green);
-  background: #f5fff7;
+  background: var(--panel-soft);
   box-shadow: 5px 5px 0 rgba(24, 168, 109, 0.18);
 }
 
@@ -359,7 +359,7 @@ button {
   padding: 14px;
   border: 2px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--panel);
 }
 
 .field {
@@ -384,7 +384,7 @@ textarea {
   width: 100%;
   border: 2px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   color: var(--ink);
   padding: 0 12px;
   font-weight: 700;
@@ -474,7 +474,7 @@ textarea {
 .overview {
   border: 3px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -1045,8 +1045,8 @@ textarea {
   border: 3px solid var(--line);
   border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(244, 184, 59, 0.5), transparent 55%),
-    #ffffff;
+    linear-gradient(135deg, rgba(244, 184, 59, 0.35), transparent 55%),
+    var(--panel);
   box-shadow: 7px 7px 0 rgba(23, 33, 29, 0.18);
   opacity: 0;
   transform: translateY(16px) scale(0.98);
@@ -1080,7 +1080,7 @@ textarea {
   height: 72px;
   border: 2px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--panel);
   object-fit: cover;
 }
 
@@ -1139,7 +1139,7 @@ textarea {
   border-radius: 8px;
   background:
     linear-gradient(135deg, rgba(199, 239, 217, 0.72), transparent 64%),
-    #ffffff;
+    var(--panel);
   box-shadow: 10px 10px 0 rgba(23, 33, 29, 0.2);
 }
 
@@ -1184,7 +1184,7 @@ textarea {
   height: 36px;
   border: 2px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--panel);
   font-weight: 900;
 }
 
@@ -1592,4 +1592,21 @@ textarea {
 .complain-btn:active {
   transform: translateY(2px);
   box-shadow: 0 2px 0px var(--ink);
+}
+
+/* Dark mode: the light-green brand wash used on cards reads as a pale
+   film over dark panels, so it's dimmed down to a faint accent tint. */
+body.dark .sidebar,
+body.dark .level-card,
+body.dark .add-card,
+body.dark .gratitude-card,
+body.dark .panel-body:has(#check-form),
+body.dark .panel-body:has(.check-item),
+body.dark .panel-body:has(.gratitude-open),
+body.dark .gratitude-modal {
+  background-image: linear-gradient(135deg, rgba(63, 185, 80, 0.1), transparent 60%);
+}
+
+body.dark .toast {
+  background-image: linear-gradient(135deg, rgba(227, 179, 65, 0.18), transparent 55%);
 }
