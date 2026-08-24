@@ -636,6 +636,62 @@ textarea {
   text-align: center;
 }
 
+.calendar-habit-list {
+  display: grid;
+  gap: 14px;
+}
+
+.calendar-habit {
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 4px 4px 0 rgba(23, 33, 29, 0.09);
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-habit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.calendar-habit-head span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.calendar-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-day {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 4px;
+  background: var(--bg);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.calendar-day.met {
+  background: var(--green);
+  border-color: var(--ink);
+  color: white;
+}
+
+.calendar-day.future {
+  opacity: 0.4;
+}
+
 .empty {
   padding: 26px;
   border: 1px dashed var(--line);

@@ -34,6 +34,7 @@ const seed = {
   profiles: [],
   tasks: [],
   habits: [],
+  habitLogs: [],
   checklist: [],
   gratitude: [],
   earnedXp: {}
@@ -215,6 +216,16 @@ function mapHabit(row, logs) {
     target: row.target_count,
     count: log?.count || 0,
     createdAt: row.created_at
+  };
+}
+
+function mapHabitLog(row) {
+  return {
+    id: row.id,
+    habitId: row.habit_id,
+    profileId: row.profile_id,
+    date: row.log_date,
+    count: row.count
   };
 }
 
@@ -453,6 +464,7 @@ async function hydrateFromSupabase() {
       profiles: profiles.map(mapProfile),
       tasks: tasks.map(mapTask),
       habits: habits.map((habit) => mapHabit(habit, habitLogs.filter((log) => log.log_date === today()))),
+      habitLogs: habitLogs.map(mapHabitLog),
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
       gratitude: gratitude.map(mapGratitude),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
@@ -464,6 +476,7 @@ async function hydrateFromSupabase() {
       profiles: state.profiles,
       tasks: state.tasks,
       habits: state.habits,
+      habitLogs: state.habitLogs,
       checklist: state.checklist,
       gratitude: state.gratitude,
       activeProfileId: state.activeProfileId
@@ -471,6 +484,7 @@ async function hydrateFromSupabase() {
       profiles: nextState.profiles,
       tasks: nextState.tasks,
       habits: nextState.habits,
+      habitLogs: nextState.habitLogs,
       checklist: nextState.checklist,
       gratitude: nextState.gratitude,
       activeProfileId: nextState.activeProfileId
@@ -677,17 +691,51 @@ function renderPanel() {
 }
 
 function renderCalendar() {
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const daysArray = Array.from({length: daysInMonth}, (_, i) => i + 1);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthLabel = now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayDate = now.getDate();
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const habits = byProfile(state.habits).sort(compareItems);
+  const habitLogs = (state.habitLogs || []).filter((log) => activeProfile() && log.profileId === activeProfile().id);
+
+  const habitRows = habits.map((habit) => {
+    const logsForHabit = habitLogs.filter((log) => log.habitId === habit.id);
+    let daysMet = 0;
+    const dayCells = daysArray.map((day) => {
+      const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const log = logsForHabit.find((item) => item.date === dateKey);
+      const met = (log?.count || 0) >= habit.target;
+      const isFuture = day > todayDate;
+      if (met) daysMet += 1;
+      const cls = isFuture ? "calendar-day future" : met ? "calendar-day met" : "calendar-day";
+      return `<div class="${cls}" title="${dateKey}">${day}</div>`;
+    }).join("");
+
+    return `
+      <article class="calendar-habit">
+        <div class="calendar-habit-head">
+          <strong>${escapeHtml(habit.title)}</strong>
+          <span>${daysMet}/${daysInMonth} days this month</span>
+        </div>
+        <div class="calendar-day-grid">${dayCells}</div>
+      </article>
+    `;
+  }).join("");
+
   return `
     <div class="section-head">
       <div>
         <h3>Calendar</h3>
+        <span>${monthLabel}</span>
       </div>
     </div>
-    <div class="calendar-grid">
-      ${daysArray.map(day => `<div class="day-box">${day}</div>`).join("")}
-    </div>
+    ${habits.length
+      ? `<div class="calendar-habit-list">${habitRows}</div>`
+      : `<div class="empty">No habits yet. Add one in the Habits tab to see it here.</div>`}
   `;
 }
 
