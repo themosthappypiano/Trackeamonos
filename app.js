@@ -18,6 +18,22 @@ const JAR_OVERFLOW_PENALTY = 500;
 const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
 const REQUEST_TIMEOUT_MS = 12000;
 const ASSET_TIMEOUT_MS = 5000;
+const DARK_MODE_KEY = "traquea-monos-dark";
+
+function loadDarkMode() {
+  try {
+    return localStorage.getItem(DARK_MODE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function applyDarkMode(enabled) {
+  document.body.classList.toggle("dark", enabled);
+}
+
+let darkModeEnabled = loadDarkMode();
+applyDarkMode(darkModeEnabled);
 
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
@@ -48,6 +64,7 @@ const seed = {
   habits: [],
   habitLogs: [],
   checklist: [],
+  checklistLogs: [],
   gratitude: [],
   earnedXp: {}
 };
@@ -262,6 +279,16 @@ function mapChecklistItem(row, logs) {
     prompt: row.prompt,
     answer: log ? log.answer : null,
     createdAt: row.created_at
+  };
+}
+
+function mapChecklistLog(row) {
+  return {
+    id: row.id,
+    checklistItemId: row.checklist_item_id,
+    profileId: row.profile_id,
+    date: row.log_date,
+    answer: row.answer
   };
 }
 
@@ -486,6 +513,7 @@ async function hydrateFromSupabase() {
       habits: habits.map((habit) => mapHabit(habit, habitLogs.filter((log) => log.log_date === today()))),
       habitLogs: habitLogs.map(mapHabitLog),
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
+      checklistLogs: checklistLogs.map(mapChecklistLog),
       gratitude: gratitude.map(mapGratitude),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
       loading: false,
@@ -499,6 +527,7 @@ async function hydrateFromSupabase() {
       habits: state.habits,
       habitLogs: state.habitLogs,
       checklist: state.checklist,
+      checklistLogs: state.checklistLogs,
       gratitude: state.gratitude,
       activeProfileId: state.activeProfileId
     }) !== JSON.stringify({
@@ -508,6 +537,7 @@ async function hydrateFromSupabase() {
       habits: nextState.habits,
       habitLogs: nextState.habitLogs,
       checklist: nextState.checklist,
+      checklistLogs: nextState.checklistLogs,
       gratitude: nextState.gratitude,
       activeProfileId: nextState.activeProfileId
     });
@@ -551,6 +581,7 @@ function render() {
         </div>
         <div class="profile-actions">
           <button class="pill-button primary" data-action="add-profile">+ Profile</button>
+          <button class="icon-button" title="Toggle dark mode" data-action="toggle-dark-mode">${darkModeEnabled ? "☀" : "🌙"}</button>
           <button class="icon-button" title="Profile settings" data-action="toggle-settings">⚙</button>
         </div>
         ${renderSidebarSettings(profile)}
@@ -636,6 +667,7 @@ function renderEmptyApp() {
         </div>
         <div class="profile-actions">
           <button class="pill-button primary" data-action="add-profile">+ Profile</button>
+          <button class="icon-button" title="Toggle dark mode" data-action="toggle-dark-mode">${darkModeEnabled ? "☀" : "🌙"}</button>
         </div>
         ${renderDailyGif()}
         <div class="profile-list">
@@ -734,6 +766,16 @@ function renderCalendarGroup(title, daysArray, dateKeyForDay, todayDate, isMetFn
   `;
 }
 
+function renderCalendarSection(icon, label, rowsHtml) {
+  if (!rowsHtml) return "";
+  return `
+    <div class="calendar-section">
+      <span class="calendar-section-label">${icon} ${label}</span>
+      <div class="item-list">${rowsHtml}</div>
+    </div>
+  `;
+}
+
 function renderCalendarDayDetail(dateKey) {
   const dayTasks = byProfile(state.tasks).filter((task) => task.date === dateKey
     || (task.status === "done" && taskCompletedDate(task) === dateKey));
@@ -743,33 +785,43 @@ function renderCalendarDayDetail(dateKey) {
     .map((log) => ({ log, habit: habitsById.get(log.habitId) }))
     .filter((entry) => entry.habit);
 
-  if (!dayTasks.length && !dayHabits.length) {
+  const checklistLogsForDay = (state.checklistLogs || []).filter((log) => activeProfile() && log.profileId === activeProfile().id && log.date === dateKey);
+  const checklistById = new Map(byProfile(state.checklist).map((item) => [item.id, item]));
+  const dayChecklist = checklistLogsForDay
+    .map((log) => ({ log, item: checklistById.get(log.checklistItemId) }))
+    .filter((entry) => entry.item);
+
+  if (!dayTasks.length && !dayHabits.length && !dayChecklist.length) {
     return `<div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>`;
   }
+
+  const taskRows = dayTasks.map((task) => `
+    <div class="calendar-upcoming-row status-${task.status}">
+      <strong>${escapeHtml(task.title)}</strong>
+      <span>${statusLabel(task.status)}</span>
+    </div>
+  `).join("");
+
+  const habitRows = dayHabits.map(({ log, habit }) => `
+    <div class="calendar-upcoming-row ${log.count >= habit.target ? "status-done" : ""}">
+      <strong>${escapeHtml(habit.title)}</strong>
+      <span>${log.count}/${habit.target} ${log.count >= habit.target ? "✓" : ""}</span>
+    </div>
+  `).join("");
+
+  const checklistRows = dayChecklist.map(({ log, item }) => `
+    <div class="calendar-upcoming-row ${log.answer ? "status-done" : "status-off"}">
+      <strong>${escapeHtml(item.prompt)}</strong>
+      <span>${log.answer ? "Yes ✓" : "No"}</span>
+    </div>
+  `).join("");
 
   return `
     <div class="calendar-day-detail">
       <h4>${formatDateLabel(dateKey)}</h4>
-      ${dayTasks.length ? `
-        <div class="item-list">
-          ${dayTasks.map((task) => `
-            <div class="calendar-upcoming-row">
-              <strong>${escapeHtml(task.title)}</strong>
-              <span>${statusLabel(task.status)}</span>
-            </div>
-          `).join("")}
-        </div>
-      ` : ""}
-      ${dayHabits.length ? `
-        <div class="item-list">
-          ${dayHabits.map(({ log, habit }) => `
-            <div class="calendar-upcoming-row">
-              <strong>${escapeHtml(habit.title)}</strong>
-              <span>${log.count}/${habit.target} ${log.count >= habit.target ? "✓" : ""}</span>
-            </div>
-          `).join("")}
-        </div>
-      ` : ""}
+      ${renderCalendarSection("📋", "Tasks", taskRows)}
+      ${renderCalendarSection("🔁", "Habits", habitRows)}
+      ${renderCalendarSection("✅", "Checklist", checklistRows)}
     </div>
   `;
 }
@@ -843,7 +895,11 @@ function renderCalendar() {
       </div>
     </div>
     <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit for its monthly count, or a task for upcoming dates…" value="${escapeHtml(state.calendarSearch || "")}" />
+    <div class="calendar-weekdays">
+      ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => `<span>${label}</span>`).join("")}
+    </div>
     <div class="calendar-grid">
+      ${Array.from({ length: new Date(year, month, 1).getDay() }, () => `<div class="day-box empty"></div>`).join("")}
       ${daysArray.map((day) => {
         const dateKey = dateKeyForDay(day);
         const cls = [
@@ -1296,6 +1352,16 @@ function handleAction(action) {
   if (action === "open-sidebar") setState({ sidebarOpen: true });
   if (action === "close-sidebar") setState({ sidebarOpen: false });
   if (action === "toggle-settings") setState({ settingsOpen: !state.settingsOpen });
+  if (action === "toggle-dark-mode") {
+    darkModeEnabled = !darkModeEnabled;
+    applyDarkMode(darkModeEnabled);
+    try {
+      localStorage.setItem(DARK_MODE_KEY, darkModeEnabled ? "1" : "0");
+    } catch (error) {
+      console.error(error);
+    }
+    render();
+  }
   if (action === "toggle-task-form") setState({ taskFormOpen: !state.taskFormOpen });
   if (action === "toggle-folder-form") setState({ folderFormOpen: !state.folderFormOpen });
   if (action === "close-folder") setState({ openFolderId: null, taskFormOpen: false });
