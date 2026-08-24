@@ -6,6 +6,10 @@ const localDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 const today = () => localDateKey();
+const formatDateLabel = (dateKey) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+};
 const SUPABASE_URL = "https://kqzwtsqntmusvdzdjhha.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxend0c3FudG11c3ZkemRqaGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDYyNjYsImV4cCI6MjA5OTgyMjI2Nn0.7t7eqkLURQSJv7v7Kv0N7Kmbly_mmVy-e0xePnLsJxY";
 const USE_SUPABASE = true;
@@ -37,6 +41,7 @@ const seed = {
   openFolderId: null,
   gratitudeOpen: false,
   calendarSearch: "",
+  selectedDay: null,
   profiles: [],
   tasks: [],
   folders: [],
@@ -729,6 +734,46 @@ function renderCalendarGroup(title, daysArray, dateKeyForDay, todayDate, isMetFn
   `;
 }
 
+function renderCalendarDayDetail(dateKey) {
+  const dayTasks = byProfile(state.tasks).filter((task) => task.date === dateKey
+    || (task.status === "done" && taskCompletedDate(task) === dateKey));
+  const habitLogs = (state.habitLogs || []).filter((log) => activeProfile() && log.profileId === activeProfile().id && log.date === dateKey);
+  const habitsById = new Map(byProfile(state.habits).map((habit) => [habit.id, habit]));
+  const dayHabits = habitLogs
+    .map((log) => ({ log, habit: habitsById.get(log.habitId) }))
+    .filter((entry) => entry.habit);
+
+  if (!dayTasks.length && !dayHabits.length) {
+    return `<div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>`;
+  }
+
+  return `
+    <div class="calendar-day-detail">
+      <h4>${formatDateLabel(dateKey)}</h4>
+      ${dayTasks.length ? `
+        <div class="item-list">
+          ${dayTasks.map((task) => `
+            <div class="calendar-upcoming-row">
+              <strong>${escapeHtml(task.title)}</strong>
+              <span>${statusLabel(task.status)}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${dayHabits.length ? `
+        <div class="item-list">
+          ${dayHabits.map(({ log, habit }) => `
+            <div class="calendar-upcoming-row">
+              <strong>${escapeHtml(habit.title)}</strong>
+              <span>${log.count}/${habit.target} ${log.count >= habit.target ? "✓" : ""}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function renderCalendar() {
   const now = new Date();
   const year = now.getFullYear();
@@ -738,32 +783,57 @@ function renderCalendar() {
   const todayDate = now.getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const dateKeyForDay = (day) => `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const todayKey = today();
 
   const query = (state.calendarSearch || "").trim().toLowerCase();
-  const habits = byProfile(state.habits).sort(compareItems)
-    .filter((habit) => !query || habit.title.toLowerCase().includes(query));
-  const habitLogs = (state.habitLogs || []).filter((log) => activeProfile() && log.profileId === activeProfile().id);
 
-  const habitRows = habits.map((habit) => {
-    const logsForHabit = habitLogs.filter((log) => log.habitId === habit.id);
-    return renderCalendarGroup(habit.title, daysArray, dateKeyForDay, todayDate, (dateKey) => {
-      const log = logsForHabit.find((item) => item.date === dateKey);
-      return (log?.count || 0) >= habit.target;
-    });
-  }).join("");
-
-  let taskRows = "";
   if (query) {
-    const matchingTasks = byProfile(state.tasks).filter((task) => task.title.toLowerCase().includes(query));
-    const taskTitles = [...new Set(matchingTasks.map((task) => task.title))];
-    taskRows = taskTitles.map((title) => {
-      const tasksWithTitle = matchingTasks.filter((task) => task.title === title);
-      return renderCalendarGroup(title, daysArray, dateKeyForDay, todayDate, (dateKey) => tasksWithTitle
-        .some((task) => task.status === "done" && taskCompletedDate(task) === dateKey));
-    }).join("");
-  }
+    const habits = byProfile(state.habits).sort(compareItems)
+      .filter((habit) => habit.title.toLowerCase().includes(query));
+    const habitLogs = (state.habitLogs || []).filter((log) => activeProfile() && log.profileId === activeProfile().id);
 
-  const hasResults = habitRows || taskRows;
+    const habitRows = habits.map((habit) => {
+      const logsForHabit = habitLogs.filter((log) => log.habitId === habit.id);
+      return renderCalendarGroup(habit.title, daysArray, dateKeyForDay, todayDate, (dateKey) => {
+        const log = logsForHabit.find((item) => item.date === dateKey);
+        return (log?.count || 0) >= habit.target;
+      });
+    }).join("");
+
+    const upcomingTasks = byProfile(state.tasks)
+      .filter((task) => task.title.toLowerCase().includes(query))
+      .filter((task) => task.status !== "done" && task.date >= todayKey)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+
+    const upcomingHtml = upcomingTasks.length ? `
+      <div class="calendar-upcoming">
+        <h4>Upcoming tasks</h4>
+        <div class="item-list">
+          ${upcomingTasks.map((task) => `
+            <div class="calendar-upcoming-row">
+              <strong>${escapeHtml(task.title)}</strong>
+              <span>${formatDateLabel(task.date)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    ` : "";
+
+    const hasResults = habitRows || upcomingHtml;
+
+    return `
+      <div class="section-head">
+        <div>
+          <h3>Calendar</h3>
+          <span>${monthLabel}</span>
+        </div>
+      </div>
+      <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit for its monthly count, or a task for upcoming dates…" value="${escapeHtml(state.calendarSearch || "")}" />
+      ${hasResults
+        ? `${habitRows ? `<div class="calendar-habit-list">${habitRows}</div>` : ""}${upcomingHtml}`
+        : `<div class="empty">No habit or upcoming task matches "${escapeHtml(state.calendarSearch)}".</div>`}
+    `;
+  }
 
   return `
     <div class="section-head">
@@ -772,17 +842,24 @@ function renderCalendar() {
         <span>${monthLabel}</span>
       </div>
     </div>
-    <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit or task…" value="${escapeHtml(state.calendarSearch || "")}" />
-    ${hasResults
-      ? `<div class="calendar-habit-list">${habitRows}${taskRows}</div>`
-      : query
-        ? `<div class="empty">No habit or task matches "${escapeHtml(state.calendarSearch)}".</div>`
-        : `<div class="empty">No habits yet. Add one in the Habits tab to see it here.</div>`}
+    <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit for its monthly count, or a task for upcoming dates…" value="${escapeHtml(state.calendarSearch || "")}" />
+    <div class="calendar-grid">
+      ${daysArray.map((day) => {
+        const dateKey = dateKeyForDay(day);
+        const cls = [
+          "day-box",
+          dateKey === todayKey ? "today" : "",
+          dateKey === state.selectedDay ? "selected" : ""
+        ].filter(Boolean).join(" ");
+        return `<div class="${cls}" data-calendar-day="${dateKey}">${day}</div>`;
+      }).join("")}
+    </div>
+    ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : `<div class="empty">Tap a day to see what's tracked on it.</div>`}
   `;
 }
 
 function closeOpenForms() {
-  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false, openFolderId: null };
+  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false, openFolderId: null, selectedDay: null };
 }
 
 function renderTaskItem(task) {
@@ -1206,6 +1283,13 @@ function bindEvents() {
       }
     });
   }
+
+  document.querySelectorAll("[data-calendar-day]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const dateKey = node.dataset.calendarDay;
+      setState({ selectedDay: state.selectedDay === dateKey ? null : dateKey });
+    });
+  });
 }
 
 function handleAction(action) {
