@@ -187,7 +187,8 @@ function mapProfile(row) {
     avatar: row.avatar || row.display_name?.[0]?.toUpperCase() || "?",
     photo: row.avatar_url || "",
     streak: row.streak_count || 0,
-    likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0
+    likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
+    complainJarAmount: row.complain_jar_amount != null ? Number(row.complain_jar_amount) : 0
   };
 }
 
@@ -423,7 +424,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,created_at&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,complain_jar_amount,created_at&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -855,10 +856,35 @@ function renderOverview(profile) {
     `;
   }
 
+  const isJonas = profile.name.toLowerCase().includes("jonas");
+  let complainJarHtml = "";
+  if (isJonas) {
+    const complainJarAmount = profile.complainJarAmount || 0;
+    const complainPileHeight = Math.min(80, Math.floor(complainJarAmount * 3));
+    const complainPileOpacity = complainJarAmount > 0 ? 0.85 : 0;
+
+    complainJarHtml = `
+      <div class="complain-jar-card">
+        <div class="complain-jar-title">😤 Jonas's Complaint Jar</div>
+        <div class="jar-wrapper">
+          <div class="piggy-jar">
+            <div class="coin-pile" style="height: ${complainPileHeight}px; opacity: ${complainPileOpacity};"></div>
+          </div>
+        </div>
+        <div class="jar-total">€${complainJarAmount.toFixed(2)}</div>
+        <button class="complain-btn" data-action="complain-jar-hit">
+          😤 He complained
+        </button>
+        <span class="reset-jar-btn" data-action="complain-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
+      </div>
+    `;
+  }
+
   return `
     <aside class="overview">
       <h3>Today</h3>
       ${likeJarHtml}
+      ${complainJarHtml}
       <div class="overview-card">
         <strong>Tasks complete</strong>
         <b>${profileStats.done}/${profileStats.tasks}</b>
@@ -1016,6 +1042,8 @@ function handleAction(action) {
   if (action === "save-gratitude") saveGratitude();
   if (action === "like-jar-hit") hitLikeJar();
   if (action === "like-jar-reset") resetLikeJar();
+  if (action === "complain-jar-hit") hitComplainJar();
+  if (action === "complain-jar-reset") resetComplainJar();
   if (action === "reset-demo") {
     try {
       localStorage.removeItem("traquea-monos-state");
@@ -1112,6 +1140,95 @@ async function resetLikeJar() {
     } catch (error) {
       console.error("Failed to reset Like Jar on Supabase:", error);
       notify("Failed to reset Like Jar on Supabase.");
+    }
+  }
+}
+
+async function hitComplainJar() {
+  const profile = activeProfile();
+  if (!profile) return;
+
+  const prevAmount = profile.complainJarAmount || 0;
+  const nextAmount = prevAmount + 0.10;
+
+  // Optimistically update local profile state
+  state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, complainJarAmount: nextAmount } : p);
+
+  const jarWrapper = document.querySelector(".complain-jar-card .jar-wrapper");
+  const piggyJar = document.querySelector(".complain-jar-card .piggy-jar");
+  const jarTotal = document.querySelector(".complain-jar-card .jar-total");
+  const coinPile = document.querySelector(".complain-jar-card .coin-pile");
+
+  if (jarWrapper && piggyJar && jarTotal && coinPile) {
+    const coin = document.createElement("div");
+    coin.className = "dropping-coin";
+    coin.dataset.targetAmount = nextAmount.toFixed(2);
+    const randomLeft = 40 + Math.random() * 40;
+    coin.style.left = `${randomLeft}px`;
+    jarWrapper.appendChild(coin);
+
+    coin.addEventListener("animationend", () => {
+      const targetAmountVal = parseFloat(coin.dataset.targetAmount);
+      coin.remove();
+
+      piggyJar.classList.add("bounce-jar");
+      piggyJar.addEventListener("animationend", () => {
+        piggyJar.classList.remove("bounce-jar");
+      }, { once: true });
+
+      for (let i = 0; i < 3; i++) {
+        const sparkle = document.createElement("div");
+        sparkle.className = "sparkle";
+        sparkle.style.left = `${20 + Math.random() * 80}px`;
+        sparkle.style.bottom = `${15 + Math.random() * 20}px`;
+        const scale = 0.5 + Math.random() * 0.7;
+        sparkle.style.transform = `scale(${scale})`;
+        sparkle.style.animation = "sparkle 0.4s ease forwards";
+        jarWrapper.appendChild(sparkle);
+        sparkle.addEventListener("animationend", () => sparkle.remove());
+      }
+
+      jarTotal.textContent = `€${targetAmountVal.toFixed(2)}`;
+      jarTotal.classList.add("scale-up");
+      setTimeout(() => jarTotal.classList.remove("scale-up"), 200);
+
+      const pileHeight = Math.min(80, Math.floor(targetAmountVal * 3));
+      coinPile.style.height = `${pileHeight}px`;
+      coinPile.style.opacity = "0.85";
+    });
+  }
+
+  // Persist update to Supabase
+  if (isUuid(profile.id)) {
+    try {
+      await supabaseRequest(`profiles?id=eq.${profile.id}`, {
+        method: "PATCH",
+        body: { complain_jar_amount: nextAmount }
+      });
+    } catch (error) {
+      console.error("Failed to update Complaint Jar on Supabase:", error);
+    }
+  }
+}
+
+async function resetComplainJar() {
+  const profile = activeProfile();
+  if (!profile) return;
+  if (!confirm("Reset Jonas's Complaint Jar to €0.00?")) return;
+
+  state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, complainJarAmount: 0 } : p);
+  render();
+
+  if (isUuid(profile.id)) {
+    try {
+      await supabaseRequest(`profiles?id=eq.${profile.id}`, {
+        method: "PATCH",
+        body: { complain_jar_amount: 0.00 }
+      });
+      notify("Complaint Jar reset on Supabase.");
+    } catch (error) {
+      console.error("Failed to reset Complaint Jar on Supabase:", error);
+      notify("Failed to reset Complaint Jar on Supabase.");
     }
   }
 }
