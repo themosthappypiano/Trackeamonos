@@ -23,7 +23,7 @@ body.dark {
   --panel: #161b22;
   --panel-soft: #1c232c;
   --line: #30363d;
-  --green: #3f8f66;
+  --green: #357a5b;
   --blue: #6a95d6;
   --red: #d9695f;
   --yellow: #b58a48;
@@ -710,6 +710,31 @@ textarea {
   border-color: var(--ink);
   color: white;
   box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.18);
+}
+
+.day-box.period {
+  position: relative;
+  border-color: var(--pink);
+}
+
+.period-dot {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.period-toggle {
+  justify-self: start;
+  background: var(--panel);
+  color: var(--pink);
+  border-color: var(--pink);
+}
+
+.period-toggle.active {
+  background: var(--pink);
+  color: var(--ink);
 }
 
 .calendar-day-detail,

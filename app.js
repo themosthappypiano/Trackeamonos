@@ -66,6 +66,7 @@ const seed = {
   checklist: [],
   checklistLogs: [],
   gratitude: [],
+  periodLogs: [],
   earnedXp: {}
 };
 
@@ -87,6 +88,7 @@ function loadState() {
       checkFormOpen: false,
       gratitudeOpen: false,
       gratitude: parsed.gratitude || base.gratitude,
+      periodLogs: parsed.periodLogs || base.periodLogs,
       checklist: normalizeChecklist(parsed.checklist || base.checklist),
       profiles: (parsed.profiles || base.profiles).map((profile) => ({
         photo: "",
@@ -301,6 +303,14 @@ function mapGratitude(row) {
   };
 }
 
+function mapPeriodLog(row) {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    date: row.log_date
+  };
+}
+
 function setState(patch) {
   state = { ...state, ...patch };
   saveState();
@@ -484,21 +494,22 @@ async function hydrateFromSupabase() {
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
-      state = { ...state, loading: false, profiles: [], tasks: [], folders: [], habits: [], checklist: [], gratitude: [], activeProfileId: null };
+      state = { ...state, loading: false, profiles: [], tasks: [], folders: [], habits: [], checklist: [], gratitude: [], periodLogs: [], activeProfileId: null };
       saveState();
       render();
       notify("Supabase connected. No profiles yet.");
       return;
     }
     const idFilter = `(${profileIds.join(",")})`;
-    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude] = await Promise.all([
+    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs] = await Promise.all([
       supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("task_folders", { query: `?select=id,profile_id,name,color,sort_order,created_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
       supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
       supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
       supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
-      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` })
+      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` }),
+      supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` })
     ]);
 
     const uiState = {
@@ -515,6 +526,7 @@ async function hydrateFromSupabase() {
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
       checklistLogs: checklistLogs.map(mapChecklistLog),
       gratitude: gratitude.map(mapGratitude),
+      periodLogs: periodLogs.map(mapPeriodLog),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
       loading: false,
       activeProfileId: profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0],
@@ -529,6 +541,7 @@ async function hydrateFromSupabase() {
       checklist: state.checklist,
       checklistLogs: state.checklistLogs,
       gratitude: state.gratitude,
+      periodLogs: state.periodLogs,
       activeProfileId: state.activeProfileId
     }) !== JSON.stringify({
       profiles: nextState.profiles,
@@ -539,6 +552,7 @@ async function hydrateFromSupabase() {
       checklist: nextState.checklist,
       checklistLogs: nextState.checklistLogs,
       gratitude: nextState.gratitude,
+      periodLogs: nextState.periodLogs,
       activeProfileId: nextState.activeProfileId
     });
     state = nextState;
@@ -791,8 +805,21 @@ function renderCalendarDayDetail(dateKey) {
     .map((log) => ({ log, item: checklistById.get(log.checklistItemId) }))
     .filter((entry) => entry.item);
 
+  const isPeriodDay = (state.periodLogs || []).some((log) => activeProfile() && log.profileId === activeProfile().id && log.date === dateKey);
+  const periodToggle = `
+    <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
+      🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
+    </button>
+  `;
+
   if (!dayTasks.length && !dayHabits.length && !dayChecklist.length) {
-    return `<div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>`;
+    return `
+      <div class="calendar-day-detail">
+        <h4>${formatDateLabel(dateKey)}</h4>
+        <div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>
+        ${periodToggle}
+      </div>
+    `;
   }
 
   const taskRows = dayTasks.map((task) => `
@@ -822,6 +849,7 @@ function renderCalendarDayDetail(dateKey) {
       ${renderCalendarSection("📋", "Tasks", taskRows)}
       ${renderCalendarSection("🔁", "Habits", habitRows)}
       ${renderCalendarSection("✅", "Checklist", checklistRows)}
+      ${periodToggle}
     </div>
   `;
 }
@@ -902,12 +930,14 @@ function renderCalendar() {
       ${Array.from({ length: new Date(year, month, 1).getDay() }, () => `<div class="day-box empty"></div>`).join("")}
       ${daysArray.map((day) => {
         const dateKey = dateKeyForDay(day);
+        const isPeriodDay = (state.periodLogs || []).some((log) => activeProfile() && log.profileId === activeProfile().id && log.date === dateKey);
         const cls = [
           "day-box",
           dateKey === todayKey ? "today" : "",
-          dateKey === state.selectedDay ? "selected" : ""
+          dateKey === state.selectedDay ? "selected" : "",
+          isPeriodDay ? "period" : ""
         ].filter(Boolean).join(" ");
-        return `<div class="${cls}" data-calendar-day="${dateKey}">${day}</div>`;
+        return `<div class="${cls}" data-calendar-day="${dateKey}">${day}${isPeriodDay ? `<span class="period-dot" title="Period day">🩸</span>` : ""}</div>`;
       }).join("")}
     </div>
     ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : `<div class="empty">Tap a day to see what's tracked on it.</div>`}
@@ -1372,6 +1402,7 @@ function handleAction(action) {
   if (action === "add-profile") addProfile();
   if (action === "save-profile") saveProfile();
   if (action === "save-gratitude") saveGratitude();
+  if (action === "toggle-period-day") togglePeriodDay();
   if (action === "like-jar-hit") hitLikeJar();
   if (action === "like-jar-reset") resetLikeJar();
   if (action === "complain-jar-hit") hitComplainJar();
@@ -1855,6 +1886,7 @@ async function deleteProfile(id) {
     habits: state.habits.filter((item) => item.profileId !== id),
     checklist: state.checklist.filter((item) => item.profileId !== id),
     gratitude: state.gratitude.filter((item) => item.profileId !== id),
+    periodLogs: state.periodLogs.filter((item) => item.profileId !== id),
     activeProfileId: state.activeProfileId === id ? remainingProfiles[0]?.id || null : state.activeProfileId,
     ...closeOpenForms(),
     settingsOpen: false,
@@ -2156,6 +2188,57 @@ async function saveGratitude() {
   saveState();
   render();
   notify("Gratitude saved.");
+}
+
+async function togglePeriodDay() {
+  const profile = activeProfile();
+  const dateKey = state.selectedDay;
+  if (!profile || !dateKey) return;
+  const existing = state.periodLogs.find((log) => log.profileId === profile.id && log.date === dateKey);
+
+  if (existing) {
+    state.periodLogs = state.periodLogs.filter((log) => log.id !== existing.id);
+    saveState();
+    render();
+    if (isUuid(existing.id)) {
+      try {
+        await supabaseRequest("period_logs", {
+          method: "DELETE",
+          query: `?id=eq.${existing.id}`,
+          prefer: "return=minimal"
+        });
+      } catch (error) {
+        console.error(error);
+        notify("Supabase period update failed.");
+      }
+    }
+    return;
+  }
+
+  const localId = uid("period");
+  state.periodLogs.push({ id: localId, profileId: profile.id, date: dateKey });
+  saveState();
+  render();
+  if (isUuid(profile.id)) {
+    try {
+      const [row] = await supabaseRequest("period_logs", {
+        method: "POST",
+        query: "?on_conflict=profile_id,log_date",
+        prefer: "resolution=merge-duplicates,return=representation",
+        body: {
+          profile_id: profile.id,
+          log_date: dateKey
+        }
+      });
+      if (row) {
+        state.periodLogs = state.periodLogs.map((log) => log.id === localId ? mapPeriodLog(row) : log);
+        saveState();
+      }
+    } catch (error) {
+      console.error(error);
+      notify("Supabase period update failed.");
+    }
+  }
 }
 
 function notify(message, options = {}) {
