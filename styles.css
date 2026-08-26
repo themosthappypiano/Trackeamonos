@@ -5,10 +5,10 @@
   --panel: #ffffff;
   --panel-soft: #f7fff5;
   --line: #242d28;
-  --green: #18a86d;
+  --green: #4fa87f;
   --blue: #236fe2;
   --red: #f05c45;
-  --yellow: #f4b83b;
+  --yellow: #e0ac4a;
   --pink: #f28db2;
   --mint: #9de6cb;
   --sidebar: #ffffff;
@@ -23,10 +23,10 @@ body.dark {
   --panel: #161b22;
   --panel-soft: #1c232c;
   --line: #30363d;
-  --green: #4a9e64;
+  --green: #3f8f66;
   --blue: #6a95d6;
   --red: #d9695f;
-  --yellow: #cc9f4d;
+  --yellow: #b58a48;
   --pink: #cf82a8;
   --mint: #55b596;
   --sidebar: #0a0d12;
@@ -556,7 +556,7 @@ textarea {
 .tab-row {
   padding: 12px;
   border-bottom: 3px solid var(--line);
-  background: #f3fff0;
+  background: var(--panel-soft);
 }
 
 .tab-button {
@@ -571,7 +571,7 @@ textarea {
 }
 
 .tab-button[data-tab="checklist"].active {
-  background: #0f8f5b;
+  background: color-mix(in srgb, var(--green) 85%, black);
 }
 
 .panel-body {
@@ -905,10 +905,10 @@ textarea {
 .task-description {
   margin: 9px 0 0;
   padding: 9px 10px;
-  border: 1px solid #d9e0dc;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f0f3f1;
-  color: #53605a;
+  background: var(--panel-soft);
+  color: var(--muted);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
@@ -1651,4 +1651,8 @@ body.dark .panel-body:has(.gratitude-open) {
 
 body.dark .calendar-search:focus {
   box-shadow: 0 0 0 3px rgba(74, 158, 100, 0.22);
+}
+
+body.dark .avatar {
+  border-color: var(--panel);
 }
