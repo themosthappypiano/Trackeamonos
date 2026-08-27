@@ -1253,9 +1253,9 @@ function renderOverview(profile) {
     `;
   }
 
-  const isJonas = profile.name.toLowerCase().includes("jonas");
+  const isJonashi = profile.name.trim().toLowerCase() === "jonashi";
   let complainJarHtml = "";
-  if (isJonas) {
+  if (isJonashi) {
     const complainJarAmount = profile.complainJarAmount || 0;
     const complainPileHeight = Math.min(80, Math.floor(complainJarAmount * 3));
     const complainPileOpacity = complainJarAmount > 0 ? 0.85 : 0;
