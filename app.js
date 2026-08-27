@@ -1051,12 +1051,10 @@ function renderTasks() {
   const folders = byProfile(state.folders).sort(compareTasks);
   const unfiledTasks = tasks.filter((task) => !task.folderId || !folders.some((folder) => folder.id === task.folderId));
 
-  const openFolder = state.openFolderId === "unfiled"
-    ? { id: "unfiled", name: "Unfiled" }
-    : folders.find((folder) => folder.id === state.openFolderId);
+  const openFolder = folders.find((folder) => folder.id === state.openFolderId);
 
   if (openFolder) {
-    const folderTasks = openFolder.id === "unfiled" ? unfiledTasks : tasks.filter((task) => task.folderId === openFolder.id);
+    const folderTasks = tasks.filter((task) => task.folderId === openFolder.id);
     return `
       <div class="section-head">
         <div>
@@ -1070,7 +1068,7 @@ function renderTasks() {
           <input id="task-title" placeholder="Task name" required />
           <textarea id="task-description" placeholder="Description optional"></textarea>
           <input id="task-date" type="date" value="${today()}" />
-          <input type="hidden" id="task-folder" value="${openFolder.id === "unfiled" ? "" : openFolder.id}" />
+          <input type="hidden" id="task-folder" value="${openFolder.id}" />
           <button class="pill-button primary" type="submit">Create</button>
         </form>
       ` : ""}
@@ -1106,7 +1104,7 @@ function renderTasks() {
         <button class="pill-button primary" type="submit">Create</button>
       </form>
     ` : ""}
-    ${folders.length || unfiledTasks.length ? `
+    ${folders.length ? `
       <div class="folder-list">
         ${folders.map((folder) => {
           const folderTasks = tasks.filter((task) => task.folderId === folder.id);
@@ -1119,15 +1117,14 @@ function renderTasks() {
             </div>
           `;
         }).join("")}
-        ${unfiledTasks.length ? `
-          <div class="folder-row static" data-open-folder="unfiled">
-            <strong>Unfiled</strong>
-            <span class="folder-count">${unfiledTasks.length} task${unfiledTasks.length === 1 ? "" : "s"}</span>
-            <span class="folder-arrow">›</span>
-          </div>
-        ` : ""}
       </div>
-    ` : `<div class="empty">No tasks yet. Add one directly, or create a folder to organize them.</div>`}
+    ` : ""}
+    ${unfiledTasks.length ? `
+      <div class="item-list">
+        ${unfiledTasks.map(renderTaskItem).join("")}
+      </div>
+    ` : ""}
+    ${!folders.length && !unfiledTasks.length ? `<div class="empty">No tasks yet. Add one directly, or create a folder to organize them.</div>` : ""}
   `;
 }
 
