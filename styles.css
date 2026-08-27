@@ -722,14 +722,6 @@ textarea {
   border-color: var(--mint);
 }
 
-.period-dot {
-  position: absolute;
-  top: 1px;
-  right: 3px;
-  font-size: 9px;
-  line-height: 1;
-}
-
 .period-toggle {
   justify-self: start;
   background: var(--panel);

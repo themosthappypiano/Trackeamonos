@@ -1010,12 +1010,7 @@ function renderCalendar() {
             isPeriodDay ? "period" : "",
             isOvulationDay ? "ovulation" : ""
           ].filter(Boolean).join(" ");
-          const marker = isPeriodDay
-            ? `<span class="period-dot" title="Period day">🩸</span>`
-            : isOvulationDay
-              ? `<span class="period-dot" title="Predicted ovulation day">🥚</span>`
-              : "";
-          return `<div class="${cls}" data-calendar-day="${dateKey}">${day}${marker}</div>`;
+          return `<div class="${cls}" data-calendar-day="${dateKey}" title="${isPeriodDay ? "Period day" : isOvulationDay ? "Predicted ovulation day" : ""}">${day}</div>`;
         }).join("");
       })()}
     </div>
@@ -1090,8 +1085,20 @@ function renderTasks() {
       <div>
         <h3>Tasks</h3>
       </div>
-      <button class="pill-button primary" data-action="toggle-folder-form">+ Add folder</button>
+      <div class="counter">
+        <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
+        <button class="pill-button primary" data-action="toggle-folder-form">+ Add folder</button>
+      </div>
     </div>
+    ${state.taskFormOpen ? `
+      <form class="add-card" id="task-form">
+        <input id="task-title" placeholder="Task name" required />
+        <textarea id="task-description" placeholder="Description optional"></textarea>
+        <input id="task-date" type="date" value="${today()}" />
+        <input type="hidden" id="task-folder" value="" />
+        <button class="pill-button primary" type="submit">Create</button>
+      </form>
+    ` : ""}
     ${state.folderFormOpen ? `
       <form class="add-card two" id="folder-form">
         <input id="folder-name" placeholder="Folder name (e.g. Work, Health, Home)" required />
@@ -1120,7 +1127,7 @@ function renderTasks() {
           </div>
         ` : ""}
       </div>
-    ` : `<div class="empty">No folders yet. Add one to start organizing your tasks.</div>`}
+    ` : `<div class="empty">No tasks yet. Add one directly, or create a folder to organize them.</div>`}
   `;
 }
 
