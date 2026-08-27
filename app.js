@@ -10,6 +10,15 @@ const formatDateLabel = (dateKey) => {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 };
+const addDaysToDateKey = (dateKey, days) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return localDateKey(new Date(year, month - 1, day + days));
+};
+const dateKeyDiffDays = (a, b) => {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((new Date(ay, am - 1, ad) - new Date(by, bm - 1, bd)) / 86400000);
+};
 const SUPABASE_URL = "https://kqzwtsqntmusvdzdjhha.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxend0c3FudG11c3ZkemRqaGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDYyNjYsImV4cCI6MjA5OTgyMjI2Nn0.7t7eqkLURQSJv7v7Kv0N7Kmbly_mmVy-e0xePnLsJxY";
 const USE_SUPABASE = true;
@@ -309,6 +318,49 @@ function mapPeriodLog(row) {
     profileId: row.profile_id,
     date: row.log_date
   };
+}
+
+function isLuabubuProfile(profile) {
+  return !!profile && (profile.name || "").trim().toLowerCase() === "luabubu";
+}
+
+function isJonashiProfile(profile) {
+  return !!profile && (profile.name || "").trim().toLowerCase() === "jonashi";
+}
+
+function findProfileByName(name) {
+  return state.profiles.find((profile) => (profile.name || "").trim().toLowerCase() === name);
+}
+
+// Period tracking is Lua's own data; Jonas only ever sees her days for awareness.
+function periodTrackingSourceProfile() {
+  const active = activeProfile();
+  if (isLuabubuProfile(active)) return active;
+  if (isJonashiProfile(active)) return findProfileByName("luabubu");
+  return null;
+}
+
+function getPeriodStartDates(profileId) {
+  const dates = (state.periodLogs || [])
+    .filter((log) => log.profileId === profileId)
+    .map((log) => log.date)
+    .sort();
+  return dates.filter((date, index) => index === 0 || dateKeyDiffDays(date, dates[index - 1]) > 1);
+}
+
+// Predicts the upcoming ovulation day from logged period start dates: ~14 days
+// before the next expected period, using the average cycle length if known.
+function getPredictedOvulationDate(profileId) {
+  const starts = getPeriodStartDates(profileId);
+  if (!starts.length) return null;
+  const lastStart = starts[starts.length - 1];
+  let cycleLength = 28;
+  if (starts.length >= 2) {
+    const gaps = starts.slice(1).map((date, index) => dateKeyDiffDays(date, starts[index]));
+    const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+    cycleLength = Math.min(35, Math.max(21, Math.round(avgGap)));
+  }
+  return addDaysToDateKey(lastStart, cycleLength - 14);
 }
 
 function setState(patch) {
@@ -805,12 +857,25 @@ function renderCalendarDayDetail(dateKey) {
     .map((log) => ({ log, item: checklistById.get(log.checklistItemId) }))
     .filter((entry) => entry.item);
 
-  const isPeriodDay = (state.periodLogs || []).some((log) => activeProfile() && log.profileId === activeProfile().id && log.date === dateKey);
-  const periodToggle = `
-    <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
-      🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
-    </button>
-  `;
+  const sourceProfile = periodTrackingSourceProfile();
+  const isPeriodDay = sourceProfile
+    ? (state.periodLogs || []).some((log) => log.profileId === sourceProfile.id && log.date === dateKey)
+    : false;
+  const isOvulationDay = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) === dateKey : false;
+  const canToggle = isLuabubuProfile(activeProfile());
+
+  let periodToggle = "";
+  if (canToggle) {
+    periodToggle = `
+      <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
+        🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
+      </button>
+    `;
+  } else if (sourceProfile && (isPeriodDay || isOvulationDay)) {
+    periodToggle = `
+      <div class="period-note">${isPeriodDay ? "🩸 Lua's period day" : "🥚 Lua's predicted ovulation day"}</div>
+    `;
+  }
 
   if (!dayTasks.length && !dayHabits.length && !dayChecklist.length) {
     return `
@@ -928,17 +993,31 @@ function renderCalendar() {
     </div>
     <div class="calendar-grid">
       ${Array.from({ length: new Date(year, month, 1).getDay() }, () => `<div class="day-box empty"></div>`).join("")}
-      ${daysArray.map((day) => {
-        const dateKey = dateKeyForDay(day);
-        const isPeriodDay = (state.periodLogs || []).some((log) => activeProfile() && log.profileId === activeProfile().id && log.date === dateKey);
-        const cls = [
-          "day-box",
-          dateKey === todayKey ? "today" : "",
-          dateKey === state.selectedDay ? "selected" : "",
-          isPeriodDay ? "period" : ""
-        ].filter(Boolean).join(" ");
-        return `<div class="${cls}" data-calendar-day="${dateKey}">${day}${isPeriodDay ? `<span class="period-dot" title="Period day">🩸</span>` : ""}</div>`;
-      }).join("")}
+      ${(() => {
+        const sourceProfile = periodTrackingSourceProfile();
+        const periodDates = sourceProfile
+          ? new Set((state.periodLogs || []).filter((log) => log.profileId === sourceProfile.id).map((log) => log.date))
+          : new Set();
+        const ovulationDate = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) : null;
+        return daysArray.map((day) => {
+          const dateKey = dateKeyForDay(day);
+          const isPeriodDay = periodDates.has(dateKey);
+          const isOvulationDay = !isPeriodDay && ovulationDate === dateKey;
+          const cls = [
+            "day-box",
+            dateKey === todayKey ? "today" : "",
+            dateKey === state.selectedDay ? "selected" : "",
+            isPeriodDay ? "period" : "",
+            isOvulationDay ? "ovulation" : ""
+          ].filter(Boolean).join(" ");
+          const marker = isPeriodDay
+            ? `<span class="period-dot" title="Period day">🩸</span>`
+            : isOvulationDay
+              ? `<span class="period-dot" title="Predicted ovulation day">🥚</span>`
+              : "";
+          return `<div class="${cls}" data-calendar-day="${dateKey}">${day}${marker}</div>`;
+        }).join("");
+      })()}
     </div>
     ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : `<div class="empty">Tap a day to see what's tracked on it.</div>`}
   `;
@@ -2193,7 +2272,7 @@ async function saveGratitude() {
 async function togglePeriodDay() {
   const profile = activeProfile();
   const dateKey = state.selectedDay;
-  if (!profile || !dateKey) return;
+  if (!profile || !dateKey || !isLuabubuProfile(profile)) return;
   const existing = state.periodLogs.find((log) => log.profileId === profile.id && log.date === dateKey);
 
   if (existing) {

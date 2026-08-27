@@ -717,6 +717,11 @@ textarea {
   border-color: var(--pink);
 }
 
+.day-box.ovulation {
+  position: relative;
+  border-color: var(--mint);
+}
+
 .period-dot {
   position: absolute;
   top: 1px;
@@ -735,6 +740,17 @@ textarea {
 .period-toggle.active {
   background: var(--pink);
   color: var(--ink);
+}
+
+.period-note {
+  justify-self: start;
+  padding: 6px 12px;
+  border: 2px solid var(--pink);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--pink);
+  background: var(--panel);
 }
 
 .calendar-day-detail,
