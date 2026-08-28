@@ -1235,7 +1235,7 @@ function renderCalendar() {
         }).join("");
       })()}
     </div>
-    ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : `<div class="empty">Tap a day.</div>`}
+    ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : ""}
   `;
 }
 
