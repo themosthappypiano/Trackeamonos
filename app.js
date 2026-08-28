@@ -89,6 +89,20 @@ function moonPhaseForDateKey(dateKey) {
   return { icon, label, isKeyPhase: isNew || isFull };
 }
 
+const LIKE_JAR_OPEN_KEY = "traquea-monos-like-jar-open";
+const COMPLAIN_JAR_OPEN_KEY = "traquea-monos-complain-jar-open";
+
+function loadFoldOpen(key) {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+let likeJarOpen = loadFoldOpen(LIKE_JAR_OPEN_KEY);
+let complainJarOpen = loadFoldOpen(COMPLAIN_JAR_OPEN_KEY);
+
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
 let loadingGifSrc = DEFAULT_GIF_SRC;
@@ -632,7 +646,7 @@ async function hydrateFromSupabase() {
       supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
       supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
       supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
-      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` }),
+      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&order=gratitude_date.desc` }),
       supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` }),
       supabaseRequest("calendar_events", { query: "?select=id,title,event_date,event_type,recurring,created_by&order=event_date.asc" })
     ]);
@@ -763,6 +777,7 @@ function render() {
         </div>
         ${renderSidebarSettings(profile)}
         ${renderDailyGif()}
+        ${renderGratitudeRecap()}
         <div class="profile-list">
           ${state.profiles.map((person) => {
             const personStats = stats(person.id);
@@ -898,6 +913,34 @@ function renderDailyGif() {
         <strong>Daily GIF</strong>
         <span>${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
       </div>
+    </section>
+  `;
+}
+
+// Latest written gratitude for Lua and Jonas, so the sidebar shows what
+// each of them has actually said they're grateful for so far.
+function latestGratitudeByName(name) {
+  const owner = findProfileByName(name);
+  if (!owner) return null;
+  const entries = (state.gratitude || [])
+    .filter((item) => item.profileId === owner.id && item.text && item.text.trim())
+    .sort((a, b) => b.date.localeCompare(a.date));
+  if (!entries.length) return null;
+  return { name: owner.name, date: entries[0].date, text: entries[0].text };
+}
+
+function renderGratitudeRecap() {
+  const entries = [latestGratitudeByName("luabubu"), latestGratitudeByName("jonashi")].filter(Boolean);
+  if (!entries.length) return "";
+  return `
+    <section class="gratitude-recap">
+      <strong>🙏 Gratitude journal</strong>
+      ${entries.map((entry) => `
+        <div class="gratitude-recap-entry">
+          <span class="gratitude-recap-name">${escapeHtml(entry.name)} <i>${formatDateLabel(entry.date)}</i></span>
+          <p>${escapeHtml(entry.text)}</p>
+        </div>
+      `).join("")}
     </section>
   `;
 }
@@ -1359,9 +1402,6 @@ function renderChecklist() {
         </article>
       `).join("") : `<div class="empty">No checklist items yet.</div>`}
     </div>
-    <div class="end-action">
-      <button class="pill-button primary gratitude-open" data-action="open-gratitude">Gratitude</button>
-    </div>
   `;
 }
 
@@ -1399,18 +1439,23 @@ function renderOverview(profile) {
     const likeJarFull = likeJarAmount >= JAR_CAPACITY;
 
     likeJarHtml = `
-      <div class="like-jar-card">
-        <div class="like-jar-title">💖 Luabubu's Like Jar</div>
-        <div class="jar-wrapper">
-          <div class="piggy-jar">
-            <div class="coin-pile" style="height: ${pileHeight}px; opacity: ${pileOpacity};"></div>
-          </div>
-        </div>
-        <div class="jar-total">€${likeJarAmount.toFixed(2)}</div>
-        <button class="like-btn" data-action="like-jar-hit" ${likeJarFull ? "disabled" : ""}>
-          ${likeJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : `👍 She said "Like"`}
+      <div class="like-jar-card ${likeJarOpen ? "open" : "folded"}">
+        <button class="jar-fold-toggle" type="button" data-action="toggle-like-jar-fold">
+          <span class="like-jar-title">💖 Luabubu's Like Jar</span>
+          <span class="jar-fold-right">€${likeJarAmount.toFixed(2)} <i class="fold-caret">${likeJarOpen ? "▾" : "▸"}</i></span>
         </button>
-        <span class="reset-jar-btn" data-action="like-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
+        ${likeJarOpen ? `
+          <div class="jar-wrapper">
+            <div class="piggy-jar">
+              <div class="coin-pile" style="height: ${pileHeight}px; opacity: ${pileOpacity};"></div>
+            </div>
+          </div>
+          <div class="jar-total">€${likeJarAmount.toFixed(2)}</div>
+          <button class="like-btn" data-action="like-jar-hit" ${likeJarFull ? "disabled" : ""}>
+            ${likeJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : `👍 She said "Like"`}
+          </button>
+          <span class="reset-jar-btn" data-action="like-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
+        ` : ""}
       </div>
     `;
   }
@@ -1424,27 +1469,41 @@ function renderOverview(profile) {
     const complainJarFull = complainJarAmount >= JAR_CAPACITY;
 
     complainJarHtml = `
-      <div class="complain-jar-card">
-        <div class="complain-jar-title">😤 Jonas's Complaint Jar</div>
-        <div class="jar-wrapper">
-          <div class="piggy-jar">
-            <div class="coin-pile" style="height: ${complainPileHeight}px; opacity: ${complainPileOpacity};"></div>
-          </div>
-        </div>
-        <div class="jar-total">€${complainJarAmount.toFixed(2)}</div>
-        <button class="complain-btn" data-action="complain-jar-hit" ${complainJarFull ? "disabled" : ""}>
-          ${complainJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : "😤 He complained"}
+      <div class="complain-jar-card ${complainJarOpen ? "open" : "folded"}">
+        <button class="jar-fold-toggle" type="button" data-action="toggle-complain-jar-fold">
+          <span class="complain-jar-title">😤 Jonas's Complaint Jar</span>
+          <span class="jar-fold-right">€${complainJarAmount.toFixed(2)} <i class="fold-caret">${complainJarOpen ? "▾" : "▸"}</i></span>
         </button>
-        <span class="reset-jar-btn" data-action="complain-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
+        ${complainJarOpen ? `
+          <div class="jar-wrapper">
+            <div class="piggy-jar">
+              <div class="coin-pile" style="height: ${complainPileHeight}px; opacity: ${complainPileOpacity};"></div>
+            </div>
+          </div>
+          <div class="jar-total">€${complainJarAmount.toFixed(2)}</div>
+          <button class="complain-btn" data-action="complain-jar-hit" ${complainJarFull ? "disabled" : ""}>
+            ${complainJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : "😤 He complained"}
+          </button>
+          <span class="reset-jar-btn" data-action="complain-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
+        ` : ""}
       </div>
     `;
   }
+
+  const gratitudeCardHtml = (isLuabubu || isJonashi) ? `
+    <div class="overview-card gratitude-trigger-card">
+      <strong>🙏 Gratitude</strong>
+      <span>Write one thing worth remembering from today.</span>
+      <button class="pill-button primary gratitude-open" data-action="open-gratitude">Open</button>
+    </div>
+  ` : "";
 
   return `
     <aside class="overview">
       <h3>Today</h3>
       ${likeJarHtml}
       ${complainJarHtml}
+      ${gratitudeCardHtml}
       <div class="overview-card">
         <strong>Tasks complete</strong>
         <b>${profileStats.done}/${profileStats.tasks}</b>
@@ -1663,6 +1722,24 @@ function handleAction(action) {
     moonPhasesEnabled = !moonPhasesEnabled;
     try {
       localStorage.setItem(MOON_PHASES_KEY, moonPhasesEnabled ? "1" : "0");
+    } catch (error) {
+      console.error(error);
+    }
+    render();
+  }
+  if (action === "toggle-like-jar-fold") {
+    likeJarOpen = !likeJarOpen;
+    try {
+      localStorage.setItem(LIKE_JAR_OPEN_KEY, likeJarOpen ? "1" : "0");
+    } catch (error) {
+      console.error(error);
+    }
+    render();
+  }
+  if (action === "toggle-complain-jar-fold") {
+    complainJarOpen = !complainJarOpen;
+    try {
+      localStorage.setItem(COMPLAIN_JAR_OPEN_KEY, complainJarOpen ? "1" : "0");
     } catch (error) {
       console.error(error);
     }
