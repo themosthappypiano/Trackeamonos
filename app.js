@@ -950,7 +950,7 @@ function renderGratitudeRecap() {
   if (!entries.length) return "";
   return `
     <section class="gratitude-recap">
-      <strong>🙏 Gratitude journal</strong>
+      <strong>Gratitude journal</strong>
       ${entries.map((entry) => `
         <div class="gratitude-recap-entry">
           <span class="gratitude-recap-name">${escapeHtml(entry.name)} <i>${formatDateLabel(entry.date)}</i></span>
@@ -1235,7 +1235,7 @@ function renderCalendar() {
         }).join("");
       })()}
     </div>
-    ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : `<div class="empty">Tap a day to see what's tracked on it.</div>`}
+    ${state.selectedDay ? renderCalendarDayDetail(state.selectedDay) : `<div class="empty">Tap a day.</div>`}
   `;
 }
 
@@ -1457,7 +1457,7 @@ function renderOverview(profile) {
     likeJarHtml = `
       <div class="like-jar-card ${likeJarOpen ? "open" : "folded"}">
         <button class="jar-fold-toggle" type="button" data-action="toggle-like-jar-fold">
-          <span class="like-jar-title">💖 Luabubu's Like Jar</span>
+          <span class="like-jar-title">Luabubu's Like Jar</span>
           <span class="jar-fold-right">€${likeJarAmount.toFixed(2)} <i class="fold-caret">${likeJarOpen ? "▾" : "▸"}</i></span>
         </button>
         ${likeJarOpen ? `
@@ -1468,7 +1468,7 @@ function renderOverview(profile) {
           </div>
           <div class="jar-total">€${likeJarAmount.toFixed(2)}</div>
           <button class="like-btn" data-action="like-jar-hit" ${likeJarFull ? "disabled" : ""}>
-            ${likeJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : `👍 She said "Like"`}
+            ${likeJarFull ? `Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : `She said "Like"`}
           </button>
           <span class="reset-jar-btn" data-action="like-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
         ` : ""}
@@ -1487,7 +1487,7 @@ function renderOverview(profile) {
     complainJarHtml = `
       <div class="complain-jar-card ${complainJarOpen ? "open" : "folded"}">
         <button class="jar-fold-toggle" type="button" data-action="toggle-complain-jar-fold">
-          <span class="complain-jar-title">😤 Jonas's Complaint Jar</span>
+          <span class="complain-jar-title">Jonas's Complaint Jar</span>
           <span class="jar-fold-right">€${complainJarAmount.toFixed(2)} <i class="fold-caret">${complainJarOpen ? "▾" : "▸"}</i></span>
         </button>
         ${complainJarOpen ? `
@@ -1498,7 +1498,7 @@ function renderOverview(profile) {
           </div>
           <div class="jar-total">€${complainJarAmount.toFixed(2)}</div>
           <button class="complain-btn" data-action="complain-jar-hit" ${complainJarFull ? "disabled" : ""}>
-            ${complainJarFull ? `🫙 Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : "😤 He complained"}
+            ${complainJarFull ? `Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : "He complained"}
           </button>
           <span class="reset-jar-btn" data-action="complain-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
         ` : ""}
@@ -1508,7 +1508,7 @@ function renderOverview(profile) {
 
   const gratitudeCardHtml = (isLuabubu || isJonashi) ? `
     <div class="overview-card gratitude-trigger-card">
-      <strong>🙏 Gratitude</strong>
+      <strong>Gratitude</strong>
       <span>Write one thing worth remembering from today.</span>
       <button class="pill-button primary gratitude-open" data-action="open-gratitude">Open</button>
     </div>
