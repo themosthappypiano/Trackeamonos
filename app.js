@@ -395,9 +395,14 @@ function mapCalendarEvent(row) {
 }
 
 // Recurring events (birthdays) match on month/day every year; one-off events match the exact date.
+// Birthdays/events are private to whoever added them — only the profile
+// that created an entry sees it on their calendar.
 function calendarEventsOnDateKey(dateKey) {
+  const owner = activeProfile();
+  if (!owner) return [];
   const [, month, day] = dateKey.split("-");
   return (state.calendarEvents || []).filter((item) => {
+    if (item.createdBy !== owner.id) return false;
     if (item.recurring) {
       const [, itemMonth, itemDay] = item.date.split("-");
       return itemMonth === month && itemDay === day;
