@@ -1518,17 +1518,17 @@ function renderOverview(profile) {
       ${likeJarHtml}
       ${complainJarHtml}
       ${gratitudeCardHtml}
-      <div class="overview-card">
+      <div class="overview-card compact">
         <strong>Tasks complete</strong>
         <b>${profileStats.done}/${profileStats.tasks}</b>
         <div class="progress-line" style="--progress-width:${taskPct}%"><div></div></div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card compact">
         <strong>Habit score</strong>
         <b>${profileStats.habitScore}%</b>
         <div class="progress-line" style="--progress-width:${profileStats.habitScore}%"><div></div></div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card compact">
         <strong>Checklist answered</strong>
         <b>${profileStats.answered}/${profileStats.checklist}</b>
         <div class="progress-line" style="--progress-width:${checkPct}%"><div></div></div>
