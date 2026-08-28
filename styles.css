@@ -1346,11 +1346,11 @@ textarea {
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  border-color: var(--green);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .gratitude-trigger-card:hover {
-  border-color: var(--green);
   transform: translateY(-2px);
 }
 
@@ -1483,7 +1483,7 @@ textarea {
   align-items: center;
   gap: 12px;
   padding: 16px;
-  border: 2px solid var(--line);
+  border: 2px solid var(--green);
   border-radius: 8px;
   background: var(--panel);
   position: relative;
@@ -1729,7 +1729,7 @@ textarea {
   align-items: center;
   gap: 12px;
   padding: 16px;
-  border: 2px solid var(--line);
+  border: 2px solid var(--green);
   border-radius: 8px;
   background: var(--panel);
   position: relative;
