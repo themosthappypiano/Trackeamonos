@@ -729,8 +729,8 @@ textarea {
 }
 
 .day-box.today {
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--green);
+  color: var(--green);
 }
 
 .day-box.selected {
@@ -742,16 +742,17 @@ textarea {
 
 .day-box.period {
   position: relative;
-  border-color: var(--pink);
+  border-color: var(--red);
 }
 
 .day-box.ovulation {
   position: relative;
-  border-color: var(--mint);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--line);
 }
 
 .day-box.birthday {
-  border-color: var(--gold);
+  border-color: var(--yellow);
 }
 
 .day-box.event {
@@ -759,7 +760,7 @@ textarea {
 }
 
 .day-box.birthday.event {
-  border-image: linear-gradient(135deg, var(--gold), var(--purple)) 1;
+  border-image: linear-gradient(135deg, var(--yellow), var(--purple)) 1;
 }
 
 .calendar-legend {
@@ -786,9 +787,9 @@ textarea {
   border: 2px solid var(--line);
 }
 
-.legend-dot.period { border-color: var(--pink); }
-.legend-dot.ovulation { border-color: var(--mint); }
-.legend-dot.birthday { border-color: var(--gold); }
+.legend-dot.period { border-color: var(--red); }
+.legend-dot.ovulation { border-color: #ffffff; box-shadow: 0 0 0 1px var(--line); }
+.legend-dot.birthday { border-color: var(--yellow); }
 .legend-dot.event { border-color: var(--purple); }
 
 .period-toggle {
