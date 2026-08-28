@@ -1507,11 +1507,9 @@ function renderOverview(profile) {
   }
 
   const gratitudeCardHtml = (isLuabubu || isJonashi) ? `
-    <div class="overview-card gratitude-trigger-card">
+    <button type="button" class="overview-card gratitude-trigger-card" data-action="open-gratitude">
       <strong>Gratitude</strong>
-      <span>Write one thing worth remembering from today.</span>
-      <button class="pill-button primary gratitude-open" data-action="open-gratitude">Open</button>
-    </div>
+    </button>
   ` : "";
 
   return `

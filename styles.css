@@ -1342,8 +1342,16 @@ textarea {
   background: linear-gradient(135deg, rgba(244, 184, 59, 0.34), rgba(35, 111, 226, 0.14)), var(--panel);
 }
 
-.gratitude-trigger-card .gratitude-open {
-  justify-self: start;
+.gratitude-trigger-card {
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gratitude-trigger-card:hover {
+  border-color: var(--green);
+  transform: translateY(-2px);
 }
 
 .gratitude-recap {
