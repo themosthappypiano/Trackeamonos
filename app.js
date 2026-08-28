@@ -65,13 +65,28 @@ const KNOWN_NEW_MOON_UTC = Date.UTC(2000, 0, 6, 18, 14, 0);
 const MOON_PHASE_ICONS = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
 const MOON_PHASE_LABELS = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous", "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
 
-function moonPhaseForDateKey(dateKey) {
+function moonAgeDays(dateKey) {
   const [year, month, day] = dateKey.split("-").map(Number);
   const noonUtc = Date.UTC(year, month - 1, day, 12, 0, 0);
   const daysSinceNew = (noonUtc - KNOWN_NEW_MOON_UTC) / 86400000;
-  const age = ((daysSinceNew % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS;
+  return ((daysSinceNew % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS;
+}
+
+// Full/new moon only mark the single calendar day whose local noon falls
+// closest to the exact 100% instant, not every day bucketed near it.
+function moonPhaseForDateKey(dateKey) {
+  const age = moonAgeDays(dateKey);
+  const prevAge = moonAgeDays(addDaysToDateKey(dateKey, -1));
+  const nextAge = moonAgeDays(addDaysToDateKey(dateKey, 1));
+  const distToNew = (a) => Math.min(a, SYNODIC_MONTH_DAYS - a);
+  const distToFull = (a) => Math.abs(a - SYNODIC_MONTH_DAYS / 2);
+  const isNew = distToNew(age) <= distToNew(prevAge) && distToNew(age) < distToNew(nextAge);
+  const isFull = !isNew && distToFull(age) <= distToFull(prevAge) && distToFull(age) < distToFull(nextAge);
+
   const index = Math.floor((age / SYNODIC_MONTH_DAYS) * 8 + 0.5) % 8;
-  return { icon: MOON_PHASE_ICONS[index], label: MOON_PHASE_LABELS[index], isKeyPhase: index === 0 || index === 4 };
+  const icon = isNew ? "🌑" : isFull ? "🌕" : MOON_PHASE_ICONS[index];
+  const label = isNew ? "New moon" : isFull ? "Full moon" : MOON_PHASE_LABELS[index];
+  return { icon, label, isKeyPhase: isNew || isFull };
 }
 
 let gifSources = [DEFAULT_GIF_SRC];
