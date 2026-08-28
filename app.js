@@ -276,6 +276,7 @@ function mapProfile(row) {
     avatar: row.avatar || row.display_name?.[0]?.toUpperCase() || "?",
     photo: row.avatar_url || "",
     streak: row.streak_count || 0,
+    lastActiveDate: row.last_active_date || null,
     likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
     complainJarAmount: row.complain_jar_amount != null ? Number(row.complain_jar_amount) : 0,
     xpPenalty: row.xp_penalty != null ? Number(row.xp_penalty) : 0
@@ -613,7 +614,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,like_jar_amount,complain_jar_amount,xp_penalty,created_at&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -697,11 +698,46 @@ async function hydrateFromSupabase() {
   }
 }
 
+// A profile's streak is the number of consecutive calendar days that profile
+// has been the active/open profile in the app. Checked once per profile per
+// day (guarded by streakCheckedProfiles) so it only bumps on the first
+// render of a new day, not on every re-render.
+let streakCheckedProfiles = new Set();
+
+function maybeBumpStreak(profile) {
+  if (!profile) return;
+  if (streakCheckedProfiles.has(profile.id)) return;
+  const todayKey = today();
+  if (profile.lastActiveDate === todayKey) {
+    streakCheckedProfiles.add(profile.id);
+    return;
+  }
+  streakCheckedProfiles.add(profile.id);
+  const yesterdayKey = addDaysToDateKey(todayKey, -1);
+  const nextStreak = profile.lastActiveDate === yesterdayKey ? (profile.streak || 0) + 1 : 1;
+  state.profiles = state.profiles.map((item) => item.id === profile.id
+    ? { ...item, streak: nextStreak, lastActiveDate: todayKey }
+    : item);
+  saveState();
+  if (isUuid(profile.id)) {
+    supabaseRequest("profiles", {
+      method: "PATCH",
+      query: `?id=eq.${profile.id}`,
+      body: { streak_count: nextStreak, last_active_date: todayKey },
+      prefer: "return=minimal"
+    }).catch((error) => {
+      console.error(error);
+      notify("Streak update failed to save to Supabase.");
+    });
+  }
+}
+
 function render() {
   if (state.loading) {
     renderLoadingApp();
     return;
   }
+  maybeBumpStreak(activeProfile());
 
   const profile = activeProfile();
   if (!profile) {
