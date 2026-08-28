@@ -28,6 +28,7 @@ const DEFAULT_GIF_SRC = "./loads/ogwlz-monkey.gif";
 const REQUEST_TIMEOUT_MS = 12000;
 const ASSET_TIMEOUT_MS = 5000;
 const DARK_MODE_KEY = "traquea-monos-dark";
+const MOON_PHASES_KEY = "traquea-monos-moon-phases";
 
 function loadDarkMode() {
   try {
@@ -43,6 +44,35 @@ function applyDarkMode(enabled) {
 
 let darkModeEnabled = loadDarkMode();
 applyDarkMode(darkModeEnabled);
+
+// Full/new moon are always shown to everyone; the other phases are an
+// opt-in local display setting (localStorage is per-browser, so this is
+// effectively "visible on this device only"). Defaults on.
+function loadMoonPhasesEnabled() {
+  try {
+    const stored = localStorage.getItem(MOON_PHASES_KEY);
+    return stored === null ? true : stored === "1";
+  } catch {
+    return true;
+  }
+}
+
+let moonPhasesEnabled = loadMoonPhasesEnabled();
+
+// Synodic month approximation, anchored to a known new moon (2000-01-06 18:14 UTC).
+const SYNODIC_MONTH_DAYS = 29.530588853;
+const KNOWN_NEW_MOON_UTC = Date.UTC(2000, 0, 6, 18, 14, 0);
+const MOON_PHASE_ICONS = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
+const MOON_PHASE_LABELS = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous", "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
+
+function moonPhaseForDateKey(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const noonUtc = Date.UTC(year, month - 1, day, 12, 0, 0);
+  const daysSinceNew = (noonUtc - KNOWN_NEW_MOON_UTC) / 86400000;
+  const age = ((daysSinceNew % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS;
+  const index = Math.floor((age / SYNODIC_MONTH_DAYS) * 8 + 0.5) % 8;
+  return { icon: MOON_PHASE_ICONS[index], label: MOON_PHASE_LABELS[index], isKeyPhase: index === 0 || index === 4 };
+}
 
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
@@ -67,6 +97,7 @@ const seed = {
   gratitudeOpen: false,
   calendarSearch: "",
   selectedDay: null,
+  eventFormOpen: false,
   profiles: [],
   tasks: [],
   folders: [],
@@ -76,6 +107,7 @@ const seed = {
   checklistLogs: [],
   gratitude: [],
   periodLogs: [],
+  calendarEvents: [],
   earnedXp: {}
 };
 
@@ -98,6 +130,7 @@ function loadState() {
       gratitudeOpen: false,
       gratitude: parsed.gratitude || base.gratitude,
       periodLogs: parsed.periodLogs || base.periodLogs,
+      calendarEvents: parsed.calendarEvents || base.calendarEvents,
       checklist: normalizeChecklist(parsed.checklist || base.checklist),
       profiles: (parsed.profiles || base.profiles).map((profile) => ({
         photo: "",
@@ -318,6 +351,29 @@ function mapPeriodLog(row) {
     profileId: row.profile_id,
     date: row.log_date
   };
+}
+
+function mapCalendarEvent(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    date: row.event_date,
+    type: row.event_type,
+    recurring: !!row.recurring,
+    createdBy: row.created_by
+  };
+}
+
+// Recurring events (birthdays) match on month/day every year; one-off events match the exact date.
+function calendarEventsOnDateKey(dateKey) {
+  const [, month, day] = dateKey.split("-");
+  return (state.calendarEvents || []).filter((item) => {
+    if (item.recurring) {
+      const [, itemMonth, itemDay] = item.date.split("-");
+      return itemMonth === month && itemDay === day;
+    }
+    return item.date === dateKey;
+  });
 }
 
 function isLuabubuProfile(profile) {
@@ -553,7 +609,7 @@ async function hydrateFromSupabase() {
       return;
     }
     const idFilter = `(${profileIds.join(",")})`;
-    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs] = await Promise.all([
+    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs, calendarEvents] = await Promise.all([
       supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("task_folders", { query: `?select=id,profile_id,name,color,sort_order,created_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
@@ -561,7 +617,8 @@ async function hydrateFromSupabase() {
       supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
       supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
       supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&gratitude_date=eq.${today()}` }),
-      supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` })
+      supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` }),
+      supabaseRequest("calendar_events", { query: "?select=id,title,event_date,event_type,recurring,created_by&order=event_date.asc" })
     ]);
 
     const uiState = {
@@ -579,6 +636,7 @@ async function hydrateFromSupabase() {
       checklistLogs: checklistLogs.map(mapChecklistLog),
       gratitude: gratitude.map(mapGratitude),
       periodLogs: periodLogs.map(mapPeriodLog),
+      calendarEvents: calendarEvents.map(mapCalendarEvent),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
       loading: false,
       activeProfileId: profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0],
@@ -594,6 +652,7 @@ async function hydrateFromSupabase() {
       checklistLogs: state.checklistLogs,
       gratitude: state.gratitude,
       periodLogs: state.periodLogs,
+      calendarEvents: state.calendarEvents,
       activeProfileId: state.activeProfileId
     }) !== JSON.stringify({
       profiles: nextState.profiles,
@@ -605,6 +664,7 @@ async function hydrateFromSupabase() {
       checklistLogs: nextState.checklistLogs,
       gratitude: nextState.gratitude,
       periodLogs: nextState.periodLogs,
+      calendarEvents: nextState.calendarEvents,
       activeProfileId: nextState.activeProfileId
     });
     state = nextState;
@@ -864,6 +924,15 @@ function renderCalendarDayDetail(dateKey) {
   const isOvulationDay = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) === dateKey : false;
   const canToggle = isLuabubuProfile(activeProfile());
 
+  const dayEvents = calendarEventsOnDateKey(dateKey);
+  const eventRows = dayEvents.map((item) => `
+    <div class="calendar-upcoming-row">
+      <strong>${item.type === "birthday" ? "🎂" : "📌"} ${escapeHtml(item.title)}</strong>
+      <button class="icon-button" title="Delete" data-delete-event-id="${item.id}">✕</button>
+    </div>
+  `).join("");
+  const eventsBlock = renderCalendarSection("🎉", "Birthdays & events", eventRows);
+
   let periodToggle = "";
   if (canToggle) {
     periodToggle = `
@@ -877,10 +946,11 @@ function renderCalendarDayDetail(dateKey) {
     `;
   }
 
-  if (!dayTasks.length && !dayHabits.length && !dayChecklist.length) {
+  if (!dayTasks.length && !dayHabits.length && !dayChecklist.length && !dayEvents.length) {
     return `
       <div class="calendar-day-detail">
         <h4>${formatDateLabel(dateKey)}</h4>
+        ${eventsBlock}
         <div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>
         ${periodToggle}
       </div>
@@ -911,6 +981,7 @@ function renderCalendarDayDetail(dateKey) {
   return `
     <div class="calendar-day-detail">
       <h4>${formatDateLabel(dateKey)}</h4>
+      ${eventsBlock}
       ${renderCalendarSection("📋", "Tasks", taskRows)}
       ${renderCalendarSection("🔁", "Habits", habitRows)}
       ${renderCalendarSection("✅", "Checklist", checklistRows)}
@@ -986,8 +1057,30 @@ function renderCalendar() {
         <h3>Calendar</h3>
         <span>${monthLabel}</span>
       </div>
+      <div class="counter">
+        <button class="pill-button primary" data-action="toggle-event-form">+ Birthday/Event</button>
+        <button class="icon-button" title="${moonPhasesEnabled ? "Hide daily moon phases (full/new moon stay visible)" : "Show daily moon phases on this device"}" data-action="toggle-moon-phases">${moonPhasesEnabled ? "🌗" : "🌑"}</button>
+      </div>
     </div>
     <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit for its monthly count, or a task for upcoming dates…" value="${escapeHtml(state.calendarSearch || "")}" />
+    ${state.eventFormOpen ? `
+      <form class="add-card" id="event-form">
+        <input id="event-title" placeholder="Whose birthday, or what's the event?" required />
+        <input id="event-date" type="date" value="${todayKey}" />
+        <select id="event-type">
+          <option value="birthday">🎂 Birthday (repeats every year)</option>
+          <option value="event">📌 One-off event</option>
+        </select>
+        <button class="pill-button primary" type="submit">Save</button>
+      </form>
+    ` : ""}
+    <div class="calendar-legend">
+      <span><i class="legend-dot period"></i> Period</span>
+      <span><i class="legend-dot ovulation"></i> Ovulation</span>
+      <span><i class="legend-dot birthday"></i> Birthday</span>
+      <span><i class="legend-dot event"></i> Event</span>
+      <span>🌕 Full moon · 🌑 New moon${moonPhasesEnabled ? " · other phases shown daily (this device only)" : ""}</span>
+    </div>
     <div class="calendar-weekdays">
       ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => `<span>${label}</span>`).join("")}
     </div>
@@ -1003,14 +1096,30 @@ function renderCalendar() {
           const dateKey = dateKeyForDay(day);
           const isPeriodDay = periodDates.has(dateKey);
           const isOvulationDay = !isPeriodDay && ovulationDate === dateKey;
+          const dayEvents = calendarEventsOnDateKey(dateKey);
+          const hasBirthday = dayEvents.some((item) => item.type === "birthday");
+          const hasEvent = dayEvents.some((item) => item.type === "event");
+          const moonPhase = moonPhaseForDateKey(dateKey);
+          const showMoon = moonPhase.isKeyPhase || moonPhasesEnabled;
+          const titleParts = [
+            isPeriodDay ? "Period day" : "",
+            isOvulationDay ? "Predicted ovulation day" : "",
+            ...dayEvents.map((item) => item.type === "birthday" ? `🎂 ${item.title}` : `📌 ${item.title}`),
+            showMoon ? moonPhase.label : ""
+          ].filter(Boolean);
           const cls = [
             "day-box",
             dateKey === todayKey ? "today" : "",
             dateKey === state.selectedDay ? "selected" : "",
             isPeriodDay ? "period" : "",
-            isOvulationDay ? "ovulation" : ""
+            isOvulationDay ? "ovulation" : "",
+            hasBirthday ? "birthday" : "",
+            hasEvent ? "event" : ""
           ].filter(Boolean).join(" ");
-          return `<div class="${cls}" data-calendar-day="${dateKey}" title="${isPeriodDay ? "Period day" : isOvulationDay ? "Predicted ovulation day" : ""}">${day}</div>`;
+          return `<div class="${cls}" data-calendar-day="${dateKey}" title="${escapeHtml(titleParts.join(" · "))}">
+            <span class="day-number">${day}</span>
+            ${showMoon ? `<span class="moon-phase">${moonPhase.icon}</span>` : ""}
+          </div>`;
         }).join("");
       })()}
     </div>
@@ -1019,7 +1128,7 @@ function renderCalendar() {
 }
 
 function closeOpenForms() {
-  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false, openFolderId: null, selectedDay: null };
+  return { taskFormOpen: false, habitFormOpen: false, checkFormOpen: false, folderFormOpen: false, openFolderId: null, selectedDay: null, eventFormOpen: false };
 }
 
 function renderTaskItem(task) {
@@ -1459,6 +1568,16 @@ function bindEvents() {
       setState({ selectedDay: state.selectedDay === dateKey ? null : dateKey });
     });
   });
+
+  const eventForm = document.querySelector("#event-form");
+  if (eventForm) eventForm.addEventListener("submit", addCalendarEvent);
+
+  document.querySelectorAll("[data-delete-event-id]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteCalendarEvent(node.dataset.deleteEventId);
+    });
+  });
 }
 
 function handleAction(action) {
@@ -1486,6 +1605,16 @@ function handleAction(action) {
   if (action === "save-profile") saveProfile();
   if (action === "save-gratitude") saveGratitude();
   if (action === "toggle-period-day") togglePeriodDay();
+  if (action === "toggle-event-form") setState({ eventFormOpen: !state.eventFormOpen });
+  if (action === "toggle-moon-phases") {
+    moonPhasesEnabled = !moonPhasesEnabled;
+    try {
+      localStorage.setItem(MOON_PHASES_KEY, moonPhasesEnabled ? "1" : "0");
+    } catch (error) {
+      console.error(error);
+    }
+    render();
+  }
   if (action === "like-jar-hit") hitLikeJar();
   if (action === "like-jar-reset") resetLikeJar();
   if (action === "complain-jar-hit") hitComplainJar();
@@ -2271,6 +2400,60 @@ async function saveGratitude() {
   saveState();
   render();
   notify("Gratitude saved.");
+}
+
+async function addCalendarEvent(event) {
+  event.preventDefault();
+  const title = document.querySelector("#event-title").value.trim();
+  const date = document.querySelector("#event-date").value || today();
+  const type = document.querySelector("#event-type").value === "event" ? "event" : "birthday";
+  if (!title) return;
+  const profile = activeProfile();
+  const recurring = type === "birthday";
+  let item = { id: uid("event"), title, date, type, recurring, createdBy: profile?.id || null };
+  if (profile && isUuid(profile.id)) {
+    try {
+      const rows = await supabaseRequest("calendar_events", {
+        method: "POST",
+        body: {
+          title,
+          event_date: date,
+          event_type: type,
+          recurring,
+          created_by: profile.id
+        }
+      });
+      item = mapCalendarEvent(rows[0]);
+    } catch (error) {
+      console.error(error);
+      notify("Saved locally. Supabase failed — has the calendar_events table been created yet?");
+    }
+  }
+  state.calendarEvents.push(item);
+  state.eventFormOpen = false;
+  saveState();
+  render();
+  notify(type === "birthday" ? "Birthday added." : "Event added.");
+}
+
+async function deleteCalendarEvent(id) {
+  const existing = (state.calendarEvents || []).find((item) => item.id === id);
+  if (!existing) return;
+  state.calendarEvents = state.calendarEvents.filter((item) => item.id !== id);
+  saveState();
+  render();
+  if (isUuid(existing.id)) {
+    try {
+      await supabaseRequest("calendar_events", {
+        method: "DELETE",
+        query: `?id=eq.${existing.id}`,
+        prefer: "return=minimal"
+      });
+    } catch (error) {
+      console.error(error);
+      notify("Supabase delete failed.");
+    }
+  }
 }
 
 async function togglePeriodDay() {

@@ -11,6 +11,8 @@
   --yellow: #e0ac4a;
   --pink: #f28db2;
   --mint: #9de6cb;
+  --gold: #e0ac4a;
+  --purple: #9d7ee6;
   --sidebar: #ffffff;
   --shadow: 8px 8px 0 rgba(23, 33, 29, 0.16);
 }
@@ -29,6 +31,8 @@ body.dark {
   --yellow: #b58a48;
   --pink: #cf82a8;
   --mint: #55b596;
+  --gold: #b58a48;
+  --purple: #8871c9;
   --sidebar: #0a0d12;
   --shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
 }
@@ -622,6 +626,19 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 180px auto;
 }
 
+#event-form {
+  grid-template-columns: minmax(0, 1fr) 150px 200px auto;
+}
+
+#event-form select {
+  padding: 8px 10px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 700;
+}
+
 #task-description {
   grid-column: 1 / -1;
 }
@@ -676,6 +693,11 @@ textarea {
 }
 
 .day-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   border: 2px solid transparent;
   border-radius: 8px;
   padding: 10px 4px;
@@ -685,6 +707,12 @@ textarea {
   font-weight: 700;
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
   box-shadow: 2px 2px 0 rgba(23, 33, 29, 0.06);
+}
+
+.day-box .moon-phase {
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.85;
 }
 
 .day-box:hover {
@@ -721,6 +749,47 @@ textarea {
   position: relative;
   border-color: var(--mint);
 }
+
+.day-box.birthday {
+  border-color: var(--gold);
+}
+
+.day-box.event {
+  border-color: var(--purple);
+}
+
+.day-box.birthday.event {
+  border-image: linear-gradient(135deg, var(--gold), var(--purple)) 1;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 2px 2px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+  border: 2px solid var(--line);
+}
+
+.legend-dot.period { border-color: var(--pink); }
+.legend-dot.ovulation { border-color: var(--mint); }
+.legend-dot.birthday { border-color: var(--gold); }
+.legend-dot.event { border-color: var(--purple); }
 
 .period-toggle {
   justify-self: start;
@@ -1324,7 +1393,8 @@ textarea {
   .habit-item,
   .check-item,
   .add-card,
-  .add-card.two {
+  .add-card.two,
+  #event-form {
     grid-template-columns: 1fr;
   }
 
