@@ -917,8 +917,18 @@ function renderDailyGif() {
   `;
 }
 
-// Latest written gratitude for Lua and Jonas, so the sidebar shows what
-// each of them has actually said they're grateful for so far.
+function hashString(value) {
+  let hash = 0;
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return hash;
+}
+
+// One of the gratitudes each of Lua and Jonas has written so far, picked in
+// no particular order — today's pick can be something from weeks ago. The
+// pick is seeded by the date + profile so it stays put for the whole day
+// instead of reshuffling on every render.
 function latestGratitudeByName(name) {
   const owner = findProfileByName(name);
   if (!owner) return null;
@@ -926,7 +936,8 @@ function latestGratitudeByName(name) {
     .filter((item) => item.profileId === owner.id && item.text && item.text.trim())
     .sort((a, b) => b.date.localeCompare(a.date));
   if (!entries.length) return null;
-  return { name: owner.name, date: entries[0].date, text: entries[0].text };
+  const index = hashString(`${today()}:${owner.id}`) % entries.length;
+  return { name: owner.name, date: entries[index].date, text: entries[index].text };
 }
 
 function renderGratitudeRecap() {
