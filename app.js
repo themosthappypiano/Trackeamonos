@@ -1126,8 +1126,10 @@ function renderCalendar() {
       </form>
     ` : ""}
     <div class="calendar-legend">
-      <span><i class="legend-dot period"></i> Period</span>
-      <span><i class="legend-dot ovulation"></i> Ovulation</span>
+      ${periodTrackingSourceProfile() ? `
+        <span><i class="legend-dot period"></i> Period</span>
+        <span><i class="legend-dot ovulation"></i> Ovulation</span>
+      ` : ""}
       <span><i class="legend-dot birthday"></i> Birthday</span>
       <span><i class="legend-dot event"></i> Event</span>
       <span>🌕 Full moon · 🌑 New moon${moonPhasesEnabled ? " · other phases shown daily (this device only)" : ""}</span>
