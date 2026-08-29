@@ -1569,9 +1569,16 @@ function bindEvents() {
   });
 
   document.querySelectorAll("[data-delete-kind]").forEach((node) => {
+    const cancelPendingOpen = () => {
+      if (node._openFolderTimer) {
+        clearTimeout(node._openFolderTimer);
+        node._openFolderTimer = null;
+      }
+    };
     const deleteFromCard = (event) => {
       if (event.target.closest("button, input, textarea, label")) return;
       event.preventDefault();
+      cancelPendingOpen();
       deleteItem(node.dataset.deleteKind, node.dataset.deleteId);
     };
     node.addEventListener("contextmenu", deleteFromCard);
@@ -1585,6 +1592,7 @@ function bindEvents() {
       if (sameCard && now - lastDeleteTap.time < 520 && distance < 28) {
         event.preventDefault();
         lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
+        cancelPendingOpen();
         deleteItem(node.dataset.deleteKind, node.dataset.deleteId);
         return;
       }
@@ -1603,9 +1611,14 @@ function bindEvents() {
   });
 
   document.querySelectorAll("[data-open-folder]").forEach((node) => {
-    node.addEventListener("click", () => {
+    node.addEventListener("click", (event) => {
+      if (event.target.closest("button, input, textarea, label")) return;
       if (Date.now() - lastDragMoveEndAt < 300) return;
-      setState({ openFolderId: node.dataset.openFolder });
+      if (node._openFolderTimer) return;
+      node._openFolderTimer = setTimeout(() => {
+        node._openFolderTimer = null;
+        setState({ openFolderId: node.dataset.openFolder });
+      }, 260);
     });
   });
 
@@ -2037,9 +2050,11 @@ async function addFolder(event) {
 async function moveTaskToFolder(taskId, folderId) {
   const task = state.tasks.find((item) => item.id === taskId);
   if (!task) return;
+  const previousFolderId = task.folderId;
   const nextFolderId = folderId || null;
-  if (task.folderId === nextFolderId) return;
+  if (previousFolderId === nextFolderId) return;
   state.tasks = state.tasks.map((item) => item.id === taskId ? { ...item, folderId: nextFolderId } : item);
+  await pruneFolderIfEmpty(previousFolderId);
   saveState();
   render();
   if (!isUuid(taskId)) return;
@@ -2051,6 +2066,27 @@ async function moveTaskToFolder(taskId, folderId) {
   } catch (error) {
     console.error(error);
     notify("Supabase failed to save the folder change.");
+  }
+}
+
+async function pruneFolderIfEmpty(folderId) {
+  if (!folderId) return;
+  const folder = state.folders.find((item) => item.id === folderId);
+  if (!folder) return;
+  const hasTasks = state.tasks.some((task) => task.folderId === folderId);
+  if (hasTasks) return;
+  state.folders = state.folders.filter((item) => item.id !== folderId);
+  if (state.openFolderId === folderId) state.openFolderId = null;
+  if (!isUuid(folderId)) return;
+  try {
+    await supabaseRequest("task_folders", {
+      method: "DELETE",
+      query: `?id=eq.${folderId}`,
+      prefer: "return=minimal"
+    });
+  } catch (error) {
+    console.error(error);
+    notify("Supabase failed to delete the empty folder.");
   }
 }
 
@@ -2206,10 +2242,14 @@ async function deleteItem(kind, id) {
   if (!collectionName || !table) return;
   if (!window.confirm("Delete this item?")) return;
 
+  const deletedTask = kind === "tasks" ? state[collectionName].find((item) => item.id === id) : null;
   state[collectionName] = state[collectionName].filter((item) => item.id !== id);
   if (kind === "folders") {
     state.tasks = state.tasks.map((task) => task.folderId === id ? { ...task, folderId: null } : task);
     if (state.openFolderId === id) state.openFolderId = null;
+  }
+  if (kind === "tasks" && deletedTask?.folderId) {
+    await pruneFolderIfEmpty(deletedTask.folderId);
   }
   saveState();
   render();

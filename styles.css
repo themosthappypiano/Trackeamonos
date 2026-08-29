@@ -1491,6 +1491,49 @@ textarea {
   }
 }
 
+@media (min-width: 981px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100vh;
+  }
+
+  .sidebar {
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .main {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .workspace {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .board {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    align-content: start;
+  }
+
+  .overview {
+    overflow-y: auto;
+  }
+}
+
 
 /* ==========================================
    Luabubu's Like Jar Custom Styles
