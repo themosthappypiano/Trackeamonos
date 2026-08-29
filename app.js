@@ -798,11 +798,6 @@ function render() {
             `;
           }).join("")}
         </div>
-        <div style="padding: 16px; margin-top: 8px;">
-          <button id="ai-bot-toggle" style="width: 100%; background: #000; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <span style="font-size: 16px;">✨</span> AI Developer
-          </button>
-        </div>
       </aside>
 
       <main class="main">
@@ -869,11 +864,6 @@ function renderEmptyApp() {
         ${renderDailyGif()}
         <div class="profile-list">
           <div class="empty">No profiles yet.</div>
-        </div>
-        <div style="padding: 16px; margin-top: 8px;">
-          <button id="ai-bot-toggle" style="width: 100%; background: #000; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <span style="font-size: 16px;">✨</span> AI Developer
-          </button>
         </div>
       </aside>
       <main class="main">
@@ -1533,7 +1523,7 @@ function renderOverview(profile) {
         <b>${profileStats.answered}/${profileStats.checklist}</b>
         <div class="progress-line" style="--progress-width:${checkPct}%"><div></div></div>
       </div>
-      <div class="overview-card xp-card">
+      <div class="overview-card xp-card compact">
         <strong>Experience</strong>
         <b>${profileStats.xp} XP</b>
         <span>Next level in ${100 - profileStats.levelProgress} XP</span>
