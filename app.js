@@ -107,6 +107,7 @@ let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
 let loadingGifSrc = DEFAULT_GIF_SRC;
 let dailyGifSrc = DEFAULT_GIF_SRC;
+let introDismissed = false;
 let syncInFlight = false;
 let taskReorderInFlight = false;
 let lastDeleteTap = { id: null, kind: null, time: 0, x: 0, y: 0 };
@@ -756,6 +757,10 @@ function render() {
     renderLoadingApp();
     return;
   }
+  if (!introDismissed) {
+    renderIntro();
+    return;
+  }
   maybeBumpStreak(activeProfile());
 
   const profile = activeProfile();
@@ -835,6 +840,19 @@ function render() {
   `;
 
   bindEvents();
+}
+
+function renderIntro() {
+  document.querySelector("#app").innerHTML = `
+    <main class="intro-screen">
+      ${appImage(dailyGifSrc, "intro-gif", "Daily GIF")}
+      <p class="intro-caption">Click to enter</p>
+    </main>
+  `;
+  document.querySelector(".intro-screen").addEventListener("click", () => {
+    introDismissed = true;
+    render();
+  });
 }
 
 function renderLoadingApp() {
@@ -1504,7 +1522,6 @@ function renderOverview(profile) {
 
   return `
     <aside class="overview">
-      <h3>Today</h3>
       ${likeJarHtml}
       ${complainJarHtml}
       ${gratitudeCardHtml}
