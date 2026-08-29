@@ -1543,6 +1543,7 @@ function renderOverview(profile) {
         <strong>Experience</strong>
         <b>${profileStats.xp} XP</b>
         <span>Next level in ${100 - profileStats.levelProgress} XP</span>
+        ${profile.xpPenalty ? `<span>-${profile.xpPenalty} XP from full jars so far</span>` : ""}
       </div>
   `;
 
@@ -1808,11 +1809,18 @@ async function hitLikeJar() {
   if (prevAmount >= JAR_CAPACITY) return;
   const nextAmount = Math.min(prevAmount + 0.10, JAR_CAPACITY);
   const justFilled = nextAmount >= JAR_CAPACITY;
+  const levelsLost = Math.floor(JAR_OVERFLOW_PENALTY / 100);
+
+  if (justFilled) {
+    const proceed = window.confirm(`Luabubu's Like Jar is about to fill up. This applies a -${JAR_OVERFLOW_PENALTY} XP penalty (~${levelsLost} levels). Continue?`);
+    if (!proceed) return;
+  }
+
   const nextPenalty = justFilled ? (profile.xpPenalty || 0) + JAR_OVERFLOW_PENALTY : profile.xpPenalty || 0;
 
   // Optimistically update local profile state
   state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, likeJarAmount: nextAmount, xpPenalty: nextPenalty } : p);
-  if (justFilled) notify(`Luabubu's Like Jar is full! -${JAR_OVERFLOW_PENALTY} XP.`);
+  if (justFilled) notify(`Luabubu's Like Jar is full! -${JAR_OVERFLOW_PENALTY} XP (~${levelsLost} levels).`);
 
   const jarWrapper = document.querySelector(".jar-wrapper");
   const piggyJar = document.querySelector(".piggy-jar");
@@ -1901,11 +1909,18 @@ async function hitComplainJar() {
   if (prevAmount >= JAR_CAPACITY) return;
   const nextAmount = Math.min(prevAmount + 0.10, JAR_CAPACITY);
   const justFilled = nextAmount >= JAR_CAPACITY;
+  const levelsLost = Math.floor(JAR_OVERFLOW_PENALTY / 100);
+
+  if (justFilled) {
+    const proceed = window.confirm(`Jonas's Complaint Jar is about to fill up. This applies a -${JAR_OVERFLOW_PENALTY} XP penalty (~${levelsLost} levels). Continue?`);
+    if (!proceed) return;
+  }
+
   const nextPenalty = justFilled ? (profile.xpPenalty || 0) + JAR_OVERFLOW_PENALTY : profile.xpPenalty || 0;
 
   // Optimistically update local profile state
   state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, complainJarAmount: nextAmount, xpPenalty: nextPenalty } : p);
-  if (justFilled) notify(`Jonas's Complaint Jar is full! -${JAR_OVERFLOW_PENALTY} XP.`);
+  if (justFilled) notify(`Jonas's Complaint Jar is full! -${JAR_OVERFLOW_PENALTY} XP (~${levelsLost} levels).`);
 
   const jarWrapper = document.querySelector(".complain-jar-card .jar-wrapper");
   const piggyJar = document.querySelector(".complain-jar-card .piggy-jar");
