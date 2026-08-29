@@ -1520,10 +1520,9 @@ function renderOverview(profile) {
     </button>
   ` : "";
 
-  return `
-    <aside class="overview">
-      ${likeJarHtml}
-      ${complainJarHtml}
+  const anyJarOpen = (isLuabubu && likeJarOpen) || (isJonashi && complainJarOpen);
+
+  const restOfOverviewHtml = anyJarOpen ? "" : `
       ${gratitudeCardHtml}
       <div class="overview-card compact">
         <strong>Tasks complete</strong>
@@ -1545,6 +1544,13 @@ function renderOverview(profile) {
         <b>${profileStats.xp} XP</b>
         <span>Next level in ${100 - profileStats.levelProgress} XP</span>
       </div>
+  `;
+
+  return `
+    <aside class="overview ${anyJarOpen ? "jar-expanded" : ""}">
+      ${likeJarHtml}
+      ${complainJarHtml}
+      ${restOfOverviewHtml}
     </aside>
   `;
 }
