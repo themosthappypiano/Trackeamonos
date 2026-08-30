@@ -2794,7 +2794,9 @@ function initMatterWorld() {
   const Engine = Matter.Engine,
         Runner = Matter.Runner,
         World = Matter.World,
-        Bodies = Matter.Bodies;
+        Bodies = Matter.Bodies,
+        Mouse = Matter.Mouse,
+        MouseConstraint = Matter.MouseConstraint;
 
   matterEngine = Engine.create();
   matterWorld = matterEngine.world;
@@ -2807,6 +2809,17 @@ function initMatterWorld() {
 
   matterRunner = Runner.create();
   Runner.start(matterRunner, matterEngine);
+
+  // Enable dragging elements with mouse
+  const mouse = Mouse.create(document.body);
+  const mouseConstraint = MouseConstraint.create(matterEngine, {
+    mouse: mouse,
+    constraint: {
+      stiffness: 0.2,
+      render: { visible: false }
+    }
+  });
+  World.add(matterWorld, mouseConstraint);
 
   Matter.Events.on(matterEngine, "afterUpdate", () => {
     monkeyBodies.forEach(item => {
