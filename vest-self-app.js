@@ -1936,3 +1936,26 @@ function spawnMonkeyOrBanana(x, y) {
   Matter.World.add(matterWorld, body);
   monkeyBodies.push({ body, domElement });
 }
+
+
+// Regular Mode Falling Banana Listener
+document.addEventListener("click", (e) => {
+  if (typeof monkeyModeActive !== "undefined" && monkeyModeActive) return;
+  
+  const banana = document.createElement("div");
+  banana.className = "regular-falling-banana";
+  banana.innerText = "🍌";
+  banana.style.left = `${e.clientX - 16}px`;
+  banana.style.top = `${e.clientY - 16}px`;
+  
+  const dx = (Math.random() - 0.5) * 140;
+  const rot = (Math.random() - 0.5) * 720;
+  banana.style.setProperty("--dx", `${dx}px`);
+  banana.style.setProperty("--rot", `${rot}deg`);
+  
+  document.body.appendChild(banana);
+  
+  setTimeout(() => {
+    if (banana.parentNode) banana.parentNode.removeChild(banana);
+  }, 1600);
+});
