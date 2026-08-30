@@ -659,16 +659,7 @@ textarea {
 }
 
 #event-form {
-  grid-template-columns: minmax(0, 1fr) 150px 200px auto;
-}
-
-#event-form select {
-  padding: 8px 10px;
-  border: 2px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--ink);
-  font-weight: 700;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
 }
 
 #task-description {
@@ -774,8 +765,9 @@ textarea {
 
 .day-box.period {
   position: relative;
-  border-color: #ffffff;
-  box-shadow: 0 0 0 1px var(--line);
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 24%, var(--panel));
+  box-shadow: 0 0 0 1px var(--blue);
 }
 
 .day-box.ovulation {
@@ -789,11 +781,8 @@ textarea {
 }
 
 .day-box.event {
-  border-color: var(--purple);
-}
-
-.day-box.birthday.event {
-  border-image: linear-gradient(135deg, var(--yellow), var(--purple)) 1;
+  border-color: var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 24%, var(--panel));
 }
 
 .calendar-legend {
@@ -820,10 +809,10 @@ textarea {
   border: 2px solid var(--line);
 }
 
-.legend-dot.period { border-color: #ffffff; box-shadow: 0 0 0 1px var(--line); }
+.legend-dot.period { background: var(--blue); border-color: var(--blue); }
 .legend-dot.ovulation { border-color: #ffffff; box-shadow: 0 0 0 1px var(--line); }
 .legend-dot.birthday { border-color: var(--yellow); }
-.legend-dot.event { border-color: var(--purple); }
+.legend-dot.event { background: var(--yellow); border-color: var(--yellow); }
 
 .period-toggle {
   justify-self: start;

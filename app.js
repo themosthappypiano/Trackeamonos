@@ -1065,7 +1065,7 @@ function renderCalendarDayDetail(dateKey) {
       <button class="icon-button" title="Delete" data-delete-event-id="${item.id}">✕</button>
     </div>
   `).join("");
-  const eventsBlock = renderCalendarSection("🎉", "Birthdays & events", eventRows);
+  const eventsBlock = renderCalendarSection("🎉", "Events", eventRows);
 
   let periodToggle = "";
   if (canToggle) {
@@ -1192,19 +1192,15 @@ function renderCalendar() {
         <span>${monthLabel}</span>
       </div>
       <div class="counter">
-        <button class="pill-button primary" data-action="toggle-event-form">+ Birthday/Event</button>
+        <button class="pill-button primary" data-action="toggle-event-form">+ Event</button>
         <button class="icon-button" title="${moonPhasesEnabled ? "Hide daily moon phases (full/new moon stay visible)" : "Show daily moon phases on this device"}" data-action="toggle-moon-phases">${moonPhasesEnabled ? "🌗" : "🌑"}</button>
       </div>
     </div>
     <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit for its monthly count, or a task for upcoming dates…" value="${escapeHtml(state.calendarSearch || "")}" />
     ${state.eventFormOpen ? `
       <form class="add-card" id="event-form">
-        <input id="event-title" placeholder="Whose birthday, or what's the event?" required />
+        <input id="event-title" placeholder="What's the event?" required />
         <input id="event-date" type="date" value="${todayKey}" />
-        <select id="event-type">
-          <option value="birthday">🎂 Birthday (repeats every year)</option>
-          <option value="event">📌 One-off event</option>
-        </select>
         <button class="pill-button primary" type="submit">Save</button>
       </form>
     ` : ""}
@@ -1213,7 +1209,6 @@ function renderCalendar() {
         <span><i class="legend-dot period"></i> Period</span>
         <span><i class="legend-dot ovulation"></i> Ovulation</span>
       ` : ""}
-      <span><i class="legend-dot birthday"></i> Birthday</span>
       <span><i class="legend-dot event"></i> Event</span>
       <span>🌕 Full moon · 🌑 New moon${moonPhasesEnabled ? " · other phases shown daily (this device only)" : ""}</span>
     </div>
@@ -2635,10 +2630,10 @@ async function addCalendarEvent(event) {
   event.preventDefault();
   const title = document.querySelector("#event-title").value.trim();
   const date = document.querySelector("#event-date").value || today();
-  const type = document.querySelector("#event-type").value === "event" ? "event" : "birthday";
+  const type = "event";
   if (!title) return;
   const profile = activeProfile();
-  const recurring = type === "birthday";
+  const recurring = false;
   let item = { id: uid("event"), title, date, type, recurring, createdBy: profile?.id || null };
   if (profile && isUuid(profile.id)) {
     try {
@@ -2662,7 +2657,7 @@ async function addCalendarEvent(event) {
   state.eventFormOpen = false;
   saveState();
   render();
-  notify(type === "birthday" ? "Birthday added." : "Event added.");
+  notify("Event added.");
 }
 
 async function deleteCalendarEvent(id) {
