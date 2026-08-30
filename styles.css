@@ -766,7 +766,6 @@ textarea {
 .day-box.period {
   position: relative;
   border-color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 24%, var(--panel));
   box-shadow: 0 0 0 1px var(--blue);
 }
 
@@ -782,7 +781,6 @@ textarea {
 
 .day-box.event {
   border-color: var(--yellow);
-  background: color-mix(in srgb, var(--yellow) 24%, var(--panel));
 }
 
 .calendar-legend {
@@ -809,10 +807,10 @@ textarea {
   border: 2px solid var(--line);
 }
 
-.legend-dot.period { background: var(--blue); border-color: var(--blue); }
+.legend-dot.period { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
 .legend-dot.ovulation { border-color: #ffffff; box-shadow: 0 0 0 1px var(--line); }
 .legend-dot.birthday { border-color: var(--yellow); }
-.legend-dot.event { background: var(--yellow); border-color: var(--yellow); }
+.legend-dot.event { border-color: var(--yellow); }
 
 .period-toggle {
   justify-self: start;
