@@ -1716,6 +1716,143 @@ function organizeKaylaData(nextState) {
   if (!kaylaProfile) return nextState;
 
   const kId = kaylaProfile.id;
+  let rawTasks = [...nextState.tasks];
+  let rawHabits = [...nextState.habits];
+  let rawChecklist = [...nextState.checklist];
+
+  const kaylaTasks = rawTasks.filter(t => t.profileId === kId);
+  const kaylaHabits = rawHabits.filter(h => h.profileId === kId);
+  const kaylaChecklist = rawChecklist.filter(c => c.profileId === kId);
+
+  const cleanTasks = [];
+  const cleanHabits = [];
+  const cleanChecklist = [];
+
+  // Helper classifier
+  function categorize(text) {
+    text = text.trim();
+    if (!text) return null;
+    const lower = text.toLowerCase();
+
+    // 1. Is it a HABIT? (repeatable daily goal/tracker)
+    const isHabit = /^(drink|water|read|pages|workout|exercise|meditate|journal|stretch|walk|floss|skincare|study|practice|steps|run|gym|yoga)/i.test(lower) ||
+                    /(water|pages|workout|meditat|journal|steps|gym)/i.test(lower);
+    if (isHabit) return "habit";
+
+    // 2. Is it a CHECKLIST? (daily yes/no statement/rule)
+    const isChecklist = /^(no |did i|confirm|check|was i|slept|ate|took |made |avoid |limit |no reels|no sugar|vitamins)/i.test(lower) ||
+                        /(no reels|no sugar|vitamins|slept early)/i.test(lower);
+    if (isChecklist) return "checklist";
+
+    // 3. Otherwise, it's a TASK (action to-do)
+    return "task";
+  }
+
+  // Process all of Kayla's items across all 3 pools
+  const allItems = [
+    ...kaylaTasks.map(t => ({ origin: "task", text: t.title, orig: t })),
+    ...kaylaHabits.map(h => ({ origin: "habit", text: h.title, orig: h })),
+    ...kaylaChecklist.map(c => ({ origin: "checklist", text: c.prompt, orig: c }))
+  ];
+
+  allItems.forEach((item, idx) => {
+    let text = item.text.trim();
+    if (!text) return;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    const category = categorize(text);
+
+    if (category === "habit") {
+      cleanHabits.push({
+        id: "habit-k-" + idx,
+        profileId: kId,
+        title: text,
+        targetCount: item.orig.targetCount || item.orig.target_count || 1,
+        count: item.orig.count || 0,
+        createdAt: item.orig.createdAt || new Date().toISOString()
+      });
+    } else if (category === "checklist") {
+      cleanChecklist.push({
+        id: "check-k-" + idx,
+        profileId: kId,
+        prompt: text,
+        answer: item.orig.answer != null ? item.orig.answer : (item.orig.status === "done" ? true : null),
+        createdAt: item.orig.createdAt || new Date().toISOString()
+      });
+    } else {
+      cleanTasks.push({
+        id: "task-k-" + idx,
+        profileId: kId,
+        title: text,
+        description: item.orig.description || "Action item",
+        date: item.orig.date || today(),
+        status: item.orig.status || (item.orig.answer === true ? "done" : "ready"),
+        sortOrder: idx + 1,
+        completedAt: item.orig.completedAt || null,
+        createdAt: item.orig.createdAt || new Date().toISOString()
+      });
+    }
+  });
+
+  // Re-assemble
+  nextState.tasks = [
+    ...rawTasks.filter(t => t.profileId !== kId),
+    ...cleanTasks
+  ];
+  nextState.habits = [
+    ...rawHabits.filter(h => h.profileId !== kId),
+    ...cleanHabits
+  ];
+  nextState.checklist = [
+    ...rawChecklist.filter(c => c.profileId !== kId),
+    ...cleanChecklist
+  ];
+
+  return nextState;
+}
+
+function renderGuideModal() {
+  return `
+    <div class="modal-backdrop open" data-action="close-guide" data-modal="true">
+      <section class="modal-card gratitude-modal" style="max-width: 520px; text-align: left;" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div>
+            <h2>📖 Trackeamonos Guide</h2>
+            <span>Everything you need to know to organize your day.</span>
+          </div>
+          <button class="icon-button" data-action="close-guide" title="Close">×</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--ink);">
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #10b981;">📋 Tasks</strong>
+            <p style="margin-top: 4px;">Specific action items for today. Check them off when completed to earn XP and level up!</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #2476d9;">🔁 Habits</strong>
+            <p style="margin-top: 4px;">Small repeatable daily wins. Tap (+) to log daily progress and build your streak 🔥.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #e25b45;">✅ End of Day Checklist</strong>
+            <p style="margin-top: 4px;">Daily confirmation statements to answer (Yes/No) before closing out your day.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #f4b83b;">🏆 Level & Streaks</strong>
+            <p style="margin-top: 4px;">Stay consistent every day to level up your avatar and keep your daily fire burning!</p>
+          </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="pill-button primary" data-action="close-guide">Got it!</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function organizeKaylaData(nextState) {
+  const kaylaProfile = nextState.profiles.find(p => p.name.toLowerCase().includes("kayla"));
+  if (!kaylaProfile) return nextState;
+
+  const kId = kaylaProfile.id;
   let tasks = [...nextState.tasks];
   let checklist = [...nextState.checklist];
 
