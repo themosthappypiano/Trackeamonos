@@ -1949,14 +1949,14 @@ body.dark .avatar {
 /* Regular Mode Falling Bananas */
 @keyframes fallAndSpin {
   0% {
-    transform: translate(0, 0) rotate(0deg) scale(0.6);
+    transform: translate(0, 0) rotate(0deg);
     opacity: 1;
   }
-  60% {
+  80% {
     opacity: 1;
   }
   100% {
-    transform: translate(var(--dx), 100vh) rotate(var(--rot)) scale(1.1);
+    transform: translate(var(--dx), 100vh) rotate(var(--rot));
     opacity: 0;
   }
 }
@@ -1965,7 +1965,7 @@ body.dark .avatar {
   position: fixed;
   pointer-events: none;
   z-index: 999999;
-  font-size: 56px;
+  font-size: 52px;
   user-select: none;
-  animation: fallAndSpin 3.2s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+  animation: fallAndSpin 4s linear forwards;
 }

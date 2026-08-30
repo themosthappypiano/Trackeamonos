@@ -2937,5 +2937,5 @@ document.addEventListener("click", (e) => {
   
   setTimeout(() => {
     if (banana.parentNode) banana.parentNode.removeChild(banana);
-  }, 3200);
+  }, 4000);
 });
