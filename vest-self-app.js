@@ -299,6 +299,12 @@ function compareItems(a, b) {
 }
 
 function compareTasks(a, b) {
+  // Always group active/in-progress tasks first, completed tasks at the bottom
+  const statusWeight = { in_progress: 0, ready: 1, done: 2 };
+  const aStatus = statusWeight[a.status] ?? 1;
+  const bStatus = statusWeight[b.status] ?? 1;
+  if (aStatus !== bStatus) return aStatus - bStatus;
+
   const aHasOrder = Number.isInteger(a.sortOrder);
   const bHasOrder = Number.isInteger(b.sortOrder);
   if (aHasOrder && bHasOrder && a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
@@ -1713,18 +1719,20 @@ function organizeKaylaData(nextState) {
   let tasks = [...nextState.tasks];
   let checklist = [...nextState.checklist];
 
-  // Re-organize items for Kayla:
-  // If a checklist prompt is actually a task (doesn't look like a yes/no statement), move it to tasks.
   const checklistForKayla = checklist.filter(item => item.profileId === kId);
   const tasksForKayla = tasks.filter(t => t.profileId === kId);
 
   const movedToTasks = [];
   const keptChecklist = [];
 
-  checklistForKayla.forEach(item => {
-    const text = item.prompt.trim();
-    // If it's an action item like "Buy...", "Finish...", "Clean...", move to tasks
-    const isTaskLike = /^(buy|clean|finish|call|send|do|write|make|pay|organize|prep|submit|schedule|pick up)/i.test(text);
+  checklistForKayla.forEach((item, idx) => {
+    let text = (item.prompt || "").trim();
+    if (!text) return;
+    // Capitalize first letter
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    // If it's an action item (task-like), move to tasks
+    const isTaskLike = /^(buy|clean|finish|call|send|do|write|make|pay|organize|prep|submit|schedule|pick up|work|study|study|read page|take|walk)/i.test(text);
     if (isTaskLike) {
       movedToTasks.push({
         id: "task-from-check-" + item.id,
@@ -1733,22 +1741,25 @@ function organizeKaylaData(nextState) {
         description: "Organized from checklist",
         date: today(),
         status: item.answer === true ? "done" : "ready",
-        sortOrder: 1,
+        sortOrder: idx + 1,
         completedAt: item.answer === true ? new Date().toISOString() : null,
         createdAt: item.createdAt || new Date().toISOString()
       });
     } else {
-      keptChecklist.push(item);
+      keptChecklist.push({ ...item, prompt: text });
     }
   });
 
   const movedToChecklist = [];
   const keptTasks = [];
 
-  tasksForKayla.forEach(t => {
-    const text = t.title.trim();
-    // If it's a statement like "No reels...", "Drink 2L...", "Did I...", move to checklist
-    const isChecklistLike = /^(no |did i|confirm|check|was i|slept|ate|read )/i.test(text);
+  tasksForKayla.forEach((t, idx) => {
+    let text = (t.title || "").trim();
+    if (!text) return;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    // If it's an end-of-day statement (checklist-like), move to checklist
+    const isChecklistLike = /^(no |did i|confirm|check|was i|slept|ate|read |no reels|drank|workout completed)/i.test(text);
     if (isChecklistLike) {
       movedToChecklist.push({
         id: "check-from-task-" + t.id,
@@ -1758,185 +1769,28 @@ function organizeKaylaData(nextState) {
         createdAt: t.createdAt || new Date().toISOString()
       });
     } else {
-      keptTasks.push(t);
+      keptTasks.push({ ...t, title: text, sortOrder: t.sortOrder ?? (idx + 1) });
     }
   });
 
-  // Re-assemble
-  nextState.tasks = [
+  // Re-assemble and deduplicate
+  const finalTasks = [
     ...tasks.filter(t => t.profileId !== kId),
     ...keptTasks,
     ...movedToTasks
   ];
-  nextState.checklist = [
+
+  const finalChecklist = [
     ...checklist.filter(c => c.profileId !== kId),
     ...keptChecklist,
     ...movedToChecklist
   ];
 
+  nextState.tasks = finalTasks;
+  nextState.checklist = finalChecklist;
+
   return nextState;
 }
-
-
-let monkeyModeActive = false;
-let matterLoaded = false;
-let matterEngine = null;
-let matterWorld = null;
-let matterRunner = null;
-let monkeyBodies = [];
-
-function toggleMonkeyMode() {
-  if (monkeyModeActive) {
-    window.location.reload();
-    return;
-  }
-  
-  monkeyModeActive = true;
-  const btn = document.getElementById("monkey-mode-btn");
-  if (btn) btn.style.background = "var(--green)";
-  
-  if (!matterLoaded) {
-    loadMatterJS();
-  }
-}
-
-function loadMatterJS() {
-  const script = document.createElement('script');
-  script.src = "https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js";
-  script.onload = () => {
-    matterLoaded = true;
-    initMatterWorld();
-  };
-  document.head.appendChild(script);
-}
-
-function initMatterWorld() {
-  const Engine = Matter.Engine,
-        Runner = Matter.Runner,
-        World = Matter.World,
-        Bodies = Matter.Bodies,
-        Mouse = Matter.Mouse,
-        MouseConstraint = Matter.MouseConstraint;
-
-  matterEngine = Engine.create();
-  matterWorld = matterEngine.world;
-
-  const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight + 50, window.innerWidth, 100, { isStatic: true });
-  const leftWall = Bodies.rectangle(-50, window.innerHeight / 2, 100, window.innerHeight, { isStatic: true });
-  const rightWall = Bodies.rectangle(window.innerWidth + 50, window.innerHeight / 2, 100, window.innerHeight, { isStatic: true });
-  
-  World.add(matterWorld, [ground, leftWall, rightWall]);
-
-  matterRunner = Runner.create();
-  Runner.start(matterRunner, matterEngine);
-
-  // Enable dragging elements with mouse
-  const mouse = Mouse.create(document.body);
-  const mouseConstraint = MouseConstraint.create(matterEngine, {
-    mouse: mouse,
-    constraint: {
-      stiffness: 0.2,
-      render: { visible: false }
-    }
-  });
-  World.add(matterWorld, mouseConstraint);
-
-  Matter.Events.on(matterEngine, "afterUpdate", () => {
-    monkeyBodies.forEach(item => {
-      const { body, domElement } = item;
-      domElement.style.transform = `translate(${body.position.x - body.width/2}px, ${body.position.y - body.height/2}px) rotate(${body.angle}rad)`;
-    });
-  });
-
-  blowUpDOM();
-
-  document.addEventListener("mousedown", (e) => {
-    if (!monkeyModeActive) return;
-    spawnMonkeyOrBanana(e.clientX, e.clientY);
-  });
-}
-
-function blowUpDOM() {
-  const interactables = Array.from(document.querySelectorAll('button, input, textarea, img, .pill-button, .card, article, h1, h2, h3, p, span, .task-actions, .status-dot'));
-  
-  interactables.forEach(el => {
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-
-    el.style.position = 'fixed';
-    el.style.left = '0px'; 
-    el.style.top = '0px';
-    el.style.width = rect.width + 'px';
-    el.style.height = rect.height + 'px';
-    el.style.margin = '0px';
-    el.style.zIndex = '9000';
-
-    const body = Matter.Bodies.rectangle(x, y, rect.width, rect.height, {
-      restitution: 0.6,
-      frictionAir: 0.02
-    });
-    
-    body.width = rect.width;
-    body.height = rect.height;
-
-    Matter.World.add(matterWorld, body);
-    monkeyBodies.push({ body, domElement: el });
-  });
-}
-
-function spawnMonkeyOrBanana(x, y) {
-  // Always spawn monkey GIFs! (with occasional bonus bananas)
-  const isBanana = Math.random() < 0.2;
-  const size = isBanana ? 40 : 100 + Math.random() * 50;
-  
-  const domElement = document.createElement("div");
-  domElement.style.position = "fixed";
-  domElement.style.top = "0px";
-  domElement.style.left = "0px";
-  domElement.style.width = size + "px";
-  domElement.style.height = size + "px";
-  domElement.style.pointerEvents = "none";
-  domElement.style.zIndex = "999999";
-  domElement.style.display = "flex";
-  domElement.style.alignItems = "center";
-  domElement.style.justifyContent = "center";
-  
-  if (isBanana) {
-    domElement.style.fontSize = (size * 0.8) + "px";
-    domElement.innerText = "🍌";
-  } else {
-    const gifs = [
-      "https://media.tenor.com/cO-b5vLz-lEAAAAC/monkey-type.gif",
-      "https://media.tenor.com/bQ9_iG-v_xYAAAAC/monkey-computer.gif",
-      "https://media.tenor.com/2Xy-o4i0sIEAAAAd/monkey-banana.gif",
-      "./loads/ogwlz-monkey.gif"
-    ];
-    const gif = gifs[Math.floor(Math.random() * gifs.length)];
-    const img = document.createElement("img");
-    img.src = gif;
-    img.style.width = "100%";
-    img.style.height = "100%";
-    img.style.objectFit = "cover";
-    img.style.borderRadius = "8px";
-    domElement.appendChild(img);
-  }
-  
-  document.body.appendChild(domElement);
-
-  const body = Matter.Bodies.rectangle(x, y, size, size, {
-    restitution: 0.8,
-    frictionAir: 0.01
-  });
-  body.width = size;
-  body.height = size;
-  
-  Matter.World.add(matterWorld, body);
-  monkeyBodies.push({ body, domElement });
-}
-
 
 // Regular Mode Falling Banana Listener
 document.addEventListener("click", (e) => {
