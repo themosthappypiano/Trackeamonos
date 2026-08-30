@@ -489,7 +489,6 @@ async function hydrateFromSupabase() {
       gratitude: nextState.gratitude,
       activeProfileId: nextState.activeProfileId
     });
-    nextState = organizeKaylaData(nextState);
     state = nextState;
     saveState();
     if (changed) render();
@@ -1673,6 +1672,43 @@ async function boot() {
 
 boot();
 
+
+function renderGuideModal() {
+  return `
+    <div class="modal-backdrop open" data-action="close-guide" data-modal="true">
+      <section class="modal-card gratitude-modal" style="max-width: 520px; text-align: left;" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div>
+            <h2>📖 Trackeamonos Guide</h2>
+            <span>Everything you need to know to organize your day.</span>
+          </div>
+          <button class="icon-button" data-action="close-guide" title="Close">×</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--ink);">
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #10b981;">📋 Tasks</strong>
+            <p style="margin-top: 4px;">Specific action items for today. Check them off when completed to earn XP and level up!</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #2476d9;">🔁 Habits</strong>
+            <p style="margin-top: 4px;">Small repeatable daily wins. Tap (+) to log daily progress and build your streak 🔥.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #e25b45;">✅ End of Day Checklist</strong>
+            <p style="margin-top: 4px;">Daily confirmation statements to answer (Yes/No) before closing out your day.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #f4b83b;">🏆 Level & Streaks</strong>
+            <p style="margin-top: 4px;">Stay consistent every day to level up your avatar and keep your daily fire burning!</p>
+          </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="pill-button primary" data-action="close-guide">Got it!</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
 
 function renderGuideModal() {
   return `
