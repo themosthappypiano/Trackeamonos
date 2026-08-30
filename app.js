@@ -661,11 +661,26 @@ async function hydrateFromSupabase() {
       ...closeOpenForms(),
       gratitudeOpen: false
     };
+    const mappedTasks = tasks.map(mapTask);
+    const nonEmptyFolders = folders
+      .map(mapFolder)
+      .filter((folder) => mappedTasks.some((task) => task.folderId === folder.id));
+    const removedFolders = folders
+      .map(mapFolder)
+      .filter((folder) => !nonEmptyFolders.some((kept) => kept.id === folder.id));
+    removedFolders.forEach((folder) => {
+      if (!isUuid(folder.id)) return;
+      supabaseRequest("task_folders", {
+        method: "DELETE",
+        query: `?id=eq.${folder.id}`,
+        prefer: "return=minimal"
+      }).catch((error) => console.error("Failed to delete empty folder:", error));
+    });
     const nextState = {
       ...state,
       profiles: profiles.map(mapProfile),
-      tasks: tasks.map(mapTask),
-      folders: folders.map(mapFolder),
+      tasks: mappedTasks,
+      folders: nonEmptyFolders,
       habits: habits.map((habit) => mapHabit(habit, habitLogs.filter((log) => log.log_date === today()))),
       habitLogs: habitLogs.map(mapHabitLog),
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
