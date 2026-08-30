@@ -1888,7 +1888,8 @@ function blowUpDOM() {
 }
 
 function spawnMonkeyOrBanana(x, y) {
-  const isBanana = Math.random() > 0.3;
+  // Always spawn monkey GIFs! (with occasional bonus bananas)
+  const isBanana = Math.random() < 0.2;
   const size = isBanana ? 40 : 100 + Math.random() * 50;
   
   const domElement = document.createElement("div");
