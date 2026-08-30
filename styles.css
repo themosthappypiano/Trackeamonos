@@ -1944,3 +1944,28 @@ body.dark .calendar-search:focus {
 body.dark .avatar {
   border-color: var(--panel);
 }
+
+
+/* Regular Mode Falling Bananas */
+@keyframes fallAndSpin {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), 100vh) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
+.regular-falling-banana {
+  position: fixed;
+  pointer-events: none;
+  z-index: 999999;
+  font-size: 52px;
+  user-select: none;
+  animation: fallAndSpin 4s linear forwards;
+}

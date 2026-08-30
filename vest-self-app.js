@@ -31,6 +31,7 @@ const seed = {
   habitFormOpen: false,
   checkFormOpen: false,
   gratitudeOpen: false,
+  guideOpen: false,
   profiles: [],
   tasks: [],
   habits: [],
@@ -56,6 +57,7 @@ function loadState() {
       habitFormOpen: false,
       checkFormOpen: false,
       gratitudeOpen: false,
+  guideOpen: false,
       gratitude: parsed.gratitude || base.gratitude,
       checklist: normalizeChecklist(parsed.checklist || base.checklist),
       profiles: (parsed.profiles || base.profiles).map((profile) => ({
@@ -297,6 +299,12 @@ function compareItems(a, b) {
 }
 
 function compareTasks(a, b) {
+  // Always group active/in-progress tasks first, completed tasks at the bottom
+  const statusWeight = { in_progress: 0, ready: 1, done: 2 };
+  const aStatus = statusWeight[a.status] ?? 1;
+  const bStatus = statusWeight[b.status] ?? 1;
+  if (aStatus !== bStatus) return aStatus - bStatus;
+
   const aHasOrder = Number.isInteger(a.sortOrder);
   const bHasOrder = Number.isInteger(b.sortOrder);
   if (aHasOrder && bHasOrder && a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
@@ -522,6 +530,7 @@ function render() {
         <div class="profile-actions">
           <button class="pill-button primary" data-action="add-profile">+ Profile</button>
           <button class="icon-button" title="Profile settings" data-action="toggle-settings">⚙</button>
+          <button class="icon-button" title="Monkey Mode" data-action="toggle-monkey-mode" id="monkey-mode-btn">🐒</button>
         </div>
         ${renderSidebarSettings(profile)}
         ${renderDailyGif()}
@@ -540,7 +549,12 @@ function render() {
             `;
           }).join("")}
         </div>
-        <div style="padding: 16px; margin-top: 8px;">
+        <div style="padding: 16px 16px 4px 16px; margin-top: 8px;">
+          <button id="guide-toggle" data-action="open-guide" style="width: 100%; background: #10b981; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <span style="font-size: 16px;">📖</span> Trackeamonos Guide
+          </button>
+        </div>
+        <div style="padding: 4px 16px 16px 16px;">
           <button id="ai-bot-toggle" style="width: 100%; background: #000; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <span style="font-size: 16px;">✨</span> AI Developer
           </button>
@@ -578,6 +592,7 @@ function render() {
         </section>
       </main>
       ${state.gratitudeOpen ? renderGratitudeModal() : ""}
+      ${state.guideOpen ? renderGuideModal() : ""}
     </div>
   `;
 
@@ -666,7 +681,12 @@ function renderDailyGif() {
 function renderTabs() {
   return `
     <div class="tab-row">
-      ${["tasks", "habits", "checklist", "calendar"].map((tab) => `
+      ${(() => {
+        const prof = activeProfile();
+        const isKayla = prof && prof.name.toLowerCase().includes("kayla");
+        const availableTabs = ["tasks", "habits", "checklist", "calendar"].filter(t => !(isKayla && t === "calendar"));
+        return availableTabs;
+      })().map((tab) => `
         <button class="tab-button ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">
           ${tabLabel(tab)}
         </button>
@@ -803,9 +823,13 @@ function renderChecklist() {
         </article>
       `).join("") : `<div class="empty">No checklist items yet.</div>`}
     </div>
-    <div class="end-action">
-      <button class="pill-button primary gratitude-open" data-action="open-gratitude">Gratitude</button>
-    </div>
+    ${(() => {
+      const prof = activeProfile();
+      if (prof && prof.name.toLowerCase().includes("kayla")) return "";
+      return `<div class="end-action">
+        <button class="pill-button primary gratitude-open" data-action="open-gratitude">Gratitude</button>
+      </div>`;
+    })()}
   `;
 }
 
@@ -1009,10 +1033,20 @@ function handleAction(action) {
   if (action === "open-sidebar") setState({ sidebarOpen: true });
   if (action === "close-sidebar") setState({ sidebarOpen: false });
   if (action === "toggle-settings") setState({ settingsOpen: !state.settingsOpen });
+  if (action === "toggle-monkey-mode") toggleMonkeyMode();
   if (action === "toggle-task-form") setState({ taskFormOpen: !state.taskFormOpen });
   if (action === "toggle-habit-form") setState({ habitFormOpen: !state.habitFormOpen });
   if (action === "toggle-check-form") setState({ checkFormOpen: !state.checkFormOpen });
-  if (action === "open-gratitude") setState({ gratitudeOpen: true });
+  if (action === "open-gratitude") {
+    const prof = activeProfile();
+    if (prof && prof.name.toLowerCase().includes("kayla")) {
+      notify("Gratitude journal is disabled.");
+      return;
+    }
+    setState({ gratitudeOpen: true });
+  }
+  if (action === "open-guide") setState({ guideOpen: true });
+  if (action === "close-guide") setState({ guideOpen: false });
   if (action === "close-gratitude") setState({ gratitudeOpen: false });
   if (action === "add-profile") addProfile();
   if (action === "save-profile") saveProfile();
@@ -1637,3 +1671,318 @@ async function boot() {
 }
 
 boot();
+
+
+function renderGuideModal() {
+  return `
+    <div class="modal-backdrop open" data-action="close-guide" data-modal="true">
+      <section class="modal-card gratitude-modal" style="max-width: 520px; text-align: left;" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div>
+            <h2>📖 Trackeamonos Guide</h2>
+            <span>Everything you need to know to organize your day.</span>
+          </div>
+          <button class="icon-button" data-action="close-guide" title="Close">×</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--ink);">
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #10b981;">📋 Tasks</strong>
+            <p style="margin-top: 4px;">Specific action items for today. Check them off when completed to earn XP and level up!</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #2476d9;">🔁 Habits</strong>
+            <p style="margin-top: 4px;">Small repeatable daily wins. Tap (+) to log daily progress and build your streak 🔥.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #e25b45;">✅ End of Day Checklist</strong>
+            <p style="margin-top: 4px;">Daily confirmation statements to answer (Yes/No) before closing out your day.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #f4b83b;">🏆 Level & Streaks</strong>
+            <p style="margin-top: 4px;">Stay consistent every day to level up your avatar and keep your daily fire burning!</p>
+          </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="pill-button primary" data-action="close-guide">Got it!</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderGuideModal() {
+  return `
+    <div class="modal-backdrop open" data-action="close-guide" data-modal="true">
+      <section class="modal-card gratitude-modal" style="max-width: 520px; text-align: left;" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div>
+            <h2>📖 Trackeamonos Guide</h2>
+            <span>Everything you need to know to organize your day.</span>
+          </div>
+          <button class="icon-button" data-action="close-guide" title="Close">×</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--ink);">
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #10b981;">📋 Tasks</strong>
+            <p style="margin-top: 4px;">Specific action items for today. Check them off when completed to earn XP and level up!</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #2476d9;">🔁 Habits</strong>
+            <p style="margin-top: 4px;">Small repeatable daily wins. Tap (+) to log daily progress and build your streak 🔥.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #e25b45;">✅ End of Day Checklist</strong>
+            <p style="margin-top: 4px;">Daily confirmation statements to answer (Yes/No) before closing out your day.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #f4b83b;">🏆 Level & Streaks</strong>
+            <p style="margin-top: 4px;">Stay consistent every day to level up your avatar and keep your daily fire burning!</p>
+          </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="pill-button primary" data-action="close-guide">Got it!</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function organizeKaylaData(nextState) {
+  const kaylaProfile = nextState.profiles.find(p => p.name.toLowerCase().includes("kayla"));
+  if (!kaylaProfile) return nextState;
+
+  const kId = kaylaProfile.id;
+  let rawTasks = [...nextState.tasks];
+  let rawHabits = [...nextState.habits];
+  let rawChecklist = [...nextState.checklist];
+
+  const kaylaTasks = rawTasks.filter(t => t.profileId === kId);
+  const kaylaHabits = rawHabits.filter(h => h.profileId === kId);
+  const kaylaChecklist = rawChecklist.filter(c => c.profileId === kId);
+
+  const cleanTasks = [];
+  const cleanHabits = [];
+  const cleanChecklist = [];
+
+  // Helper classifier
+  function categorize(text) {
+    text = text.trim();
+    if (!text) return null;
+    const lower = text.toLowerCase();
+
+    // 1. Is it a HABIT? (repeatable daily goal/tracker)
+    const isHabit = /^(drink|water|read|pages|workout|exercise|meditate|journal|stretch|walk|floss|skincare|study|practice|steps|run|gym|yoga)/i.test(lower) ||
+                    /(water|pages|workout|meditat|journal|steps|gym)/i.test(lower);
+    if (isHabit) return "habit";
+
+    // 2. Is it a CHECKLIST? (daily yes/no statement/rule)
+    const isChecklist = /^(no |did i|confirm|check|was i|slept|ate|took |made |avoid |limit |no reels|no sugar|vitamins)/i.test(lower) ||
+                        /(no reels|no sugar|vitamins|slept early)/i.test(lower);
+    if (isChecklist) return "checklist";
+
+    // 3. Otherwise, it's a TASK (action to-do)
+    return "task";
+  }
+
+  // Process all of Kayla's items across all 3 pools
+  const allItems = [
+    ...kaylaTasks.map(t => ({ origin: "task", text: t.title, orig: t })),
+    ...kaylaHabits.map(h => ({ origin: "habit", text: h.title, orig: h })),
+    ...kaylaChecklist.map(c => ({ origin: "checklist", text: c.prompt, orig: c }))
+  ];
+
+  allItems.forEach((item, idx) => {
+    let text = item.text.trim();
+    if (!text) return;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    const category = categorize(text);
+
+    if (category === "habit") {
+      cleanHabits.push({
+        id: "habit-k-" + idx,
+        profileId: kId,
+        title: text,
+        targetCount: item.orig.targetCount || item.orig.target_count || 1,
+        count: item.orig.count || 0,
+        createdAt: item.orig.createdAt || new Date().toISOString()
+      });
+    } else if (category === "checklist") {
+      cleanChecklist.push({
+        id: "check-k-" + idx,
+        profileId: kId,
+        prompt: text,
+        answer: item.orig.answer != null ? item.orig.answer : (item.orig.status === "done" ? true : null),
+        createdAt: item.orig.createdAt || new Date().toISOString()
+      });
+    } else {
+      cleanTasks.push({
+        id: "task-k-" + idx,
+        profileId: kId,
+        title: text,
+        description: item.orig.description || "Action item",
+        date: item.orig.date || today(),
+        status: item.orig.status || (item.orig.answer === true ? "done" : "ready"),
+        sortOrder: idx + 1,
+        completedAt: item.orig.completedAt || null,
+        createdAt: item.orig.createdAt || new Date().toISOString()
+      });
+    }
+  });
+
+  // Re-assemble
+  nextState.tasks = [
+    ...rawTasks.filter(t => t.profileId !== kId),
+    ...cleanTasks
+  ];
+  nextState.habits = [
+    ...rawHabits.filter(h => h.profileId !== kId),
+    ...cleanHabits
+  ];
+  nextState.checklist = [
+    ...rawChecklist.filter(c => c.profileId !== kId),
+    ...cleanChecklist
+  ];
+
+  return nextState;
+}
+
+function renderGuideModal() {
+  return `
+    <div class="modal-backdrop open" data-action="close-guide" data-modal="true">
+      <section class="modal-card gratitude-modal" style="max-width: 520px; text-align: left;" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div>
+            <h2>📖 Trackeamonos Guide</h2>
+            <span>Everything you need to know to organize your day.</span>
+          </div>
+          <button class="icon-button" data-action="close-guide" title="Close">×</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--ink);">
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #10b981;">📋 Tasks</strong>
+            <p style="margin-top: 4px;">Specific action items for today. Check them off when completed to earn XP and level up!</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #2476d9;">🔁 Habits</strong>
+            <p style="margin-top: 4px;">Small repeatable daily wins. Tap (+) to log daily progress and build your streak 🔥.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #e25b45;">✅ End of Day Checklist</strong>
+            <p style="margin-top: 4px;">Daily confirmation statements to answer (Yes/No) before closing out your day.</p>
+          </div>
+          <div style="background: var(--surface-subtle, #f3f4f6); padding: 12px; border-radius: 8px;">
+            <strong style="color: #f4b83b;">🏆 Level & Streaks</strong>
+            <p style="margin-top: 4px;">Stay consistent every day to level up your avatar and keep your daily fire burning!</p>
+          </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="pill-button primary" data-action="close-guide">Got it!</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function organizeKaylaData(nextState) {
+  const kaylaProfile = nextState.profiles.find(p => p.name.toLowerCase().includes("kayla"));
+  if (!kaylaProfile) return nextState;
+
+  const kId = kaylaProfile.id;
+  let tasks = [...nextState.tasks];
+  let checklist = [...nextState.checklist];
+
+  const checklistForKayla = checklist.filter(item => item.profileId === kId);
+  const tasksForKayla = tasks.filter(t => t.profileId === kId);
+
+  const movedToTasks = [];
+  const keptChecklist = [];
+
+  checklistForKayla.forEach((item, idx) => {
+    let text = (item.prompt || "").trim();
+    if (!text) return;
+    // Capitalize first letter
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    // If it's an action item (task-like), move to tasks
+    const isTaskLike = /^(buy|clean|finish|call|send|do|write|make|pay|organize|prep|submit|schedule|pick up|work|study|study|read page|take|walk)/i.test(text);
+    if (isTaskLike) {
+      movedToTasks.push({
+        id: "task-from-check-" + item.id,
+        profileId: kId,
+        title: text,
+        description: "Organized from checklist",
+        date: today(),
+        status: item.answer === true ? "done" : "ready",
+        sortOrder: idx + 1,
+        completedAt: item.answer === true ? new Date().toISOString() : null,
+        createdAt: item.createdAt || new Date().toISOString()
+      });
+    } else {
+      keptChecklist.push({ ...item, prompt: text });
+    }
+  });
+
+  const movedToChecklist = [];
+  const keptTasks = [];
+
+  tasksForKayla.forEach((t, idx) => {
+    let text = (t.title || "").trim();
+    if (!text) return;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    // If it's an end-of-day statement (checklist-like), move to checklist
+    const isChecklistLike = /^(no |did i|confirm|check|was i|slept|ate|read |no reels|drank|workout completed)/i.test(text);
+    if (isChecklistLike) {
+      movedToChecklist.push({
+        id: "check-from-task-" + t.id,
+        profileId: kId,
+        prompt: text,
+        answer: t.status === "done" ? true : null,
+        createdAt: t.createdAt || new Date().toISOString()
+      });
+    } else {
+      keptTasks.push({ ...t, title: text, sortOrder: t.sortOrder ?? (idx + 1) });
+    }
+  });
+
+  // Re-assemble and deduplicate
+  const finalTasks = [
+    ...tasks.filter(t => t.profileId !== kId),
+    ...keptTasks,
+    ...movedToTasks
+  ];
+
+  const finalChecklist = [
+    ...checklist.filter(c => c.profileId !== kId),
+    ...keptChecklist,
+    ...movedToChecklist
+  ];
+
+  nextState.tasks = finalTasks;
+  nextState.checklist = finalChecklist;
+
+  return nextState;
+}
+
+// Regular Mode Falling Banana Listener
+document.addEventListener("click", (e) => {
+  if (typeof monkeyModeActive !== "undefined" && monkeyModeActive) return;
+  
+  const banana = document.createElement("div");
+  banana.className = "regular-falling-banana";
+  banana.innerText = "🍌";
+  banana.style.left = `${e.clientX - 16}px`;
+  banana.style.top = `${e.clientY - 16}px`;
+  
+  const dx = (Math.random() - 0.5) * 140;
+  const rot = (Math.random() - 0.5) * 720;
+  banana.style.setProperty("--dx", `${dx}px`);
+  banana.style.setProperty("--rot", `${rot}deg`);
+  
+  document.body.appendChild(banana);
+  
+  setTimeout(() => {
+    if (banana.parentNode) banana.parentNode.removeChild(banana);
+  }, 4000);
+});

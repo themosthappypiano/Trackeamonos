@@ -799,6 +799,7 @@ function render() {
           <button class="pill-button primary" data-action="add-profile">+ Profile</button>
           <button class="icon-button" title="Toggle dark mode" data-action="toggle-dark-mode">${darkModeEnabled ? "☀" : "🌙"}</button>
           <button class="icon-button" title="Profile settings" data-action="toggle-settings">⚙</button>
+          <button class="icon-button" title="Monkey Mode" data-action="toggle-monkey-mode" id="monkey-mode-btn">🐒</button>
         </div>
         ${renderSidebarSettings(profile)}
         ${renderDailyGif()}
@@ -1752,6 +1753,7 @@ function handleAction(action) {
   if (action === "open-sidebar") setState({ sidebarOpen: true });
   if (action === "close-sidebar") setState({ sidebarOpen: false });
   if (action === "toggle-settings") setState({ settingsOpen: !state.settingsOpen });
+  if (action === "toggle-monkey-mode") toggleMonkeyMode();
   if (action === "toggle-dark-mode") {
     darkModeEnabled = !darkModeEnabled;
     applyDarkMode(darkModeEnabled);
@@ -2769,3 +2771,186 @@ async function boot() {
 }
 
 boot();
+
+
+let monkeyModeActive = false;
+let matterLoaded = false;
+let matterEngine = null;
+let matterWorld = null;
+let matterRunner = null;
+let monkeyBodies = [];
+
+function toggleMonkeyMode() {
+  if (monkeyModeActive) {
+    window.location.reload();
+    return;
+  }
+  
+  monkeyModeActive = true;
+  const btn = document.getElementById("monkey-mode-btn");
+  if (btn) btn.style.background = "var(--green)";
+  
+  if (!matterLoaded) {
+    loadMatterJS();
+  }
+}
+
+function loadMatterJS() {
+  const script = document.createElement('script');
+  script.src = "https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js";
+  script.onload = () => {
+    matterLoaded = true;
+    initMatterWorld();
+  };
+  document.head.appendChild(script);
+}
+
+function initMatterWorld() {
+  const Engine = Matter.Engine,
+        Runner = Matter.Runner,
+        World = Matter.World,
+        Bodies = Matter.Bodies,
+        Mouse = Matter.Mouse,
+        MouseConstraint = Matter.MouseConstraint;
+
+  matterEngine = Engine.create();
+  matterWorld = matterEngine.world;
+
+  const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight + 50, window.innerWidth, 100, { isStatic: true });
+  const leftWall = Bodies.rectangle(-50, window.innerHeight / 2, 100, window.innerHeight, { isStatic: true });
+  const rightWall = Bodies.rectangle(window.innerWidth + 50, window.innerHeight / 2, 100, window.innerHeight, { isStatic: true });
+  
+  World.add(matterWorld, [ground, leftWall, rightWall]);
+
+  matterRunner = Runner.create();
+  Runner.start(matterRunner, matterEngine);
+
+  // Enable dragging elements with mouse
+  const mouse = Mouse.create(document.body);
+  const mouseConstraint = MouseConstraint.create(matterEngine, {
+    mouse: mouse,
+    constraint: {
+      stiffness: 0.2,
+      render: { visible: false }
+    }
+  });
+  World.add(matterWorld, mouseConstraint);
+
+  Matter.Events.on(matterEngine, "afterUpdate", () => {
+    monkeyBodies.forEach(item => {
+      const { body, domElement } = item;
+      domElement.style.transform = `translate(${body.position.x - body.width/2}px, ${body.position.y - body.height/2}px) rotate(${body.angle}rad)`;
+    });
+  });
+
+  blowUpDOM();
+
+  document.addEventListener("mousedown", (e) => {
+    if (!monkeyModeActive) return;
+    spawnMonkeyOrBanana(e.clientX, e.clientY);
+  });
+}
+
+function blowUpDOM() {
+  const interactables = Array.from(document.querySelectorAll('button, input, textarea, img, .pill-button, .card, article, h1, h2, h3, p, span, .task-actions, .status-dot'));
+  
+  interactables.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    el.style.position = 'fixed';
+    el.style.left = '0px'; 
+    el.style.top = '0px';
+    el.style.width = rect.width + 'px';
+    el.style.height = rect.height + 'px';
+    el.style.margin = '0px';
+    el.style.zIndex = '9000';
+
+    const body = Matter.Bodies.rectangle(x, y, rect.width, rect.height, {
+      restitution: 0.6,
+      frictionAir: 0.02
+    });
+    
+    body.width = rect.width;
+    body.height = rect.height;
+
+    Matter.World.add(matterWorld, body);
+    monkeyBodies.push({ body, domElement: el });
+  });
+}
+
+function spawnMonkeyOrBanana(x, y) {
+  // Always spawn monkey GIFs! (with occasional bonus bananas)
+  const isBanana = Math.random() < 0.2;
+  const size = isBanana ? 40 : 100 + Math.random() * 50;
+  
+  const domElement = document.createElement("div");
+  domElement.style.position = "fixed";
+  domElement.style.top = "0px";
+  domElement.style.left = "0px";
+  domElement.style.width = size + "px";
+  domElement.style.height = size + "px";
+  domElement.style.pointerEvents = "none";
+  domElement.style.zIndex = "999999";
+  domElement.style.display = "flex";
+  domElement.style.alignItems = "center";
+  domElement.style.justifyContent = "center";
+  
+  if (isBanana) {
+    domElement.style.fontSize = (size * 0.8) + "px";
+    domElement.innerText = "🍌";
+  } else {
+    const gifs = [
+      "https://media.tenor.com/cO-b5vLz-lEAAAAC/monkey-type.gif",
+      "https://media.tenor.com/bQ9_iG-v_xYAAAAC/monkey-computer.gif",
+      "https://media.tenor.com/2Xy-o4i0sIEAAAAd/monkey-banana.gif",
+      "./loads/ogwlz-monkey.gif"
+    ];
+    const gif = gifs[Math.floor(Math.random() * gifs.length)];
+    const img = document.createElement("img");
+    img.src = gif;
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "8px";
+    domElement.appendChild(img);
+  }
+  
+  document.body.appendChild(domElement);
+
+  const body = Matter.Bodies.rectangle(x, y, size, size, {
+    restitution: 0.8,
+    frictionAir: 0.01
+  });
+  body.width = size;
+  body.height = size;
+  
+  Matter.World.add(matterWorld, body);
+  monkeyBodies.push({ body, domElement });
+}
+
+
+// Regular Mode Falling Banana Listener
+document.addEventListener("click", (e) => {
+  if (typeof monkeyModeActive !== "undefined" && monkeyModeActive) return;
+  
+  const banana = document.createElement("div");
+  banana.className = "regular-falling-banana";
+  banana.innerText = "🍌";
+  banana.style.left = `${e.clientX - 16}px`;
+  banana.style.top = `${e.clientY - 16}px`;
+  
+  const dx = (Math.random() - 0.5) * 140;
+  const rot = (Math.random() - 0.5) * 720;
+  banana.style.setProperty("--dx", `${dx}px`);
+  banana.style.setProperty("--rot", `${rot}deg`);
+  
+  document.body.appendChild(banana);
+  
+  setTimeout(() => {
+    if (banana.parentNode) banana.parentNode.removeChild(banana);
+  }, 4000);
+});
