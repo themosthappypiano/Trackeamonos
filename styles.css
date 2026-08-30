@@ -1965,7 +1965,7 @@ body.dark .avatar {
   position: fixed;
   pointer-events: none;
   z-index: 999999;
-  font-size: 32px;
+  font-size: 56px;
   user-select: none;
-  animation: fallAndSpin 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: fallAndSpin 3.2s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
 }
