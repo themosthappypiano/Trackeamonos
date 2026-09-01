@@ -888,15 +888,19 @@ function render() {
   `;
 
   bindEvents();
-  const newMain = document.querySelector(".main");
-  if (newMain) newMain.scrollTop = scrollTop;
-  window.scrollTo(0, windowScrollY);
-  const newTaskBank = document.querySelector(".schedule-task-bank");
-  if (newTaskBank) newTaskBank.scrollTop = taskBankScrollTop;
-  const newPanelBody = document.querySelector(".panel-body");
-  if (newPanelBody) newPanelBody.scrollTop = panelBodyScrollTop;
-  const newOverview = document.querySelector(".overview");
-  if (newOverview) newOverview.scrollTop = overviewScrollTop;
+  const restoreScroll = () => {
+    const newMain = document.querySelector(".main");
+    if (newMain) newMain.scrollTop = scrollTop;
+    window.scrollTo(0, windowScrollY);
+    const newTaskBank = document.querySelector(".schedule-task-bank");
+    if (newTaskBank) newTaskBank.scrollTop = taskBankScrollTop;
+    const newPanelBody = document.querySelector(".panel-body");
+    if (newPanelBody) newPanelBody.scrollTop = panelBodyScrollTop;
+    const newOverview = document.querySelector(".overview");
+    if (newOverview) newOverview.scrollTop = overviewScrollTop;
+  };
+  restoreScroll();
+  requestAnimationFrame(restoreScroll);
 }
 
 function renderIntro() {
