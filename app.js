@@ -1021,7 +1021,7 @@ function renderGratitudeRecap() {
 function renderTabs() {
   return `
     <div class="tab-row">
-      ${["tasks", "timer", "schedule", "habits", "checklist", "calendar"].map((tab) => `
+      ${["tasks", "timer", "schedule", "checklist", "calendar"].map((tab) => `
         <button class="tab-button ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">
           ${tabLabel(tab)}
         </button>
@@ -1033,7 +1033,6 @@ function renderTabs() {
 function renderPanel() {
   if (state.activeTab === "timer") return typeof renderTikTikTimer === "function" ? renderTikTikTimer() : "";
   if (state.activeTab === "schedule") return typeof renderTikTikSchedule === "function" ? renderTikTikSchedule() : "";
-  if (state.activeTab === "habits") return renderHabits();
   if (state.activeTab === "checklist") return renderChecklist();
   if (state.activeTab === "calendar") return renderCalendar();
   return renderTasks();
@@ -1421,15 +1420,19 @@ function renderTasks() {
   `;
 }
 
-function renderHabits() {
+function renderChecklist() {
   const habits = byProfile(state.habits).sort(compareItems);
+  const checks = byProfile(state.checklist).sort(compareItems);
   return `
     <div class="section-head">
       <div>
-        <h3>Habits</h3>
-        <span>Small repeatable wins that build streaks.</span>
+        <h3>Checklist</h3>
+        <span>Habits and daily statements to confirm before the day closes.</span>
       </div>
-      <button class="pill-button primary" data-action="toggle-habit-form">+ Add habit</button>
+      <div class="counter">
+        <button class="pill-button" data-action="toggle-habit-form">+ Add habit</button>
+        <button class="pill-button primary" data-action="toggle-check-form">+ Add item</button>
+      </div>
     </div>
     ${state.habitFormOpen ? `
       <form class="add-card two" id="habit-form">
@@ -1438,8 +1441,14 @@ function renderHabits() {
         <button class="pill-button primary" type="submit">Create</button>
       </form>
     ` : ""}
+    ${state.checkFormOpen ? `
+      <form class="add-card" id="check-form">
+        <input id="check-prompt" placeholder="Example: No reels today" required />
+        <button class="pill-button primary" type="submit">Create</button>
+      </form>
+    ` : ""}
     <div class="item-list">
-      ${habits.length ? habits.map((habit) => {
+      ${habits.map((habit) => {
         const pct = Math.min(100, Math.round(habit.count / habit.target * 100));
         return `
           <article class="habit-item" data-delete-kind="habits" data-delete-id="${habit.id}" data-drag-kind="habits" data-drag-id="${habit.id}" data-drag-scope="habits">
@@ -1455,29 +1464,8 @@ function renderHabits() {
             </div>
           </article>
         `;
-      }).join("") : `<div class="empty">No habits yet. Add one that feels easy to repeat.</div>`}
-    </div>
-  `;
-}
-
-function renderChecklist() {
-  const checks = byProfile(state.checklist).sort(compareItems);
-  return `
-    <div class="section-head">
-      <div>
-        <h3>End of day</h3>
-        <span>Daily statements to confirm before the day closes.</span>
-      </div>
-      <button class="pill-button primary" data-action="toggle-check-form">+ Add item</button>
-    </div>
-    ${state.checkFormOpen ? `
-      <form class="add-card" id="check-form">
-        <input id="check-prompt" placeholder="Example: No reels today" required />
-        <button class="pill-button primary" type="submit">Create</button>
-      </form>
-    ` : ""}
-    <div class="item-list">
-      ${checks.length ? checks.map((item) => `
+      }).join("")}
+      ${checks.map((item) => `
         <article class="check-item" data-delete-kind="checklist" data-delete-id="${item.id}" data-drag-kind="checklist" data-drag-id="${item.id}" data-drag-scope="checklist">
           <div class="item-title">
             <strong>${escapeHtml(item.prompt)}</strong>
@@ -1488,7 +1476,8 @@ function renderChecklist() {
             <button class="${item.answer === false ? "active no" : ""}" data-check="${item.id}:false">No</button>
           </div>
         </article>
-      `).join("") : `<div class="empty">No checklist items yet.</div>`}
+      `).join("")}
+      ${!habits.length && !checks.length ? `<div class="empty">No habits or checklist items yet.</div>` : ""}
     </div>
   `;
 }
