@@ -656,6 +656,27 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 110px auto;
 }
 
+.folder-color-swatches {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.folder-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--swatch-color);
+  cursor: pointer;
+  padding: 0;
+}
+
+.folder-color-swatch:hover {
+  transform: scale(1.1);
+}
+
 #task-form {
   grid-template-columns: minmax(0, 1fr) 180px auto;
 }

@@ -1372,6 +1372,14 @@ function renderTasks() {
       <form class="add-card two" id="folder-form">
         <input id="folder-name" placeholder="Folder name (e.g. Work, Health, Home)" required />
         <input id="folder-color" type="color" value="#44bba4" />
+        ${(() => {
+          const pastColors = [...new Set(folders.map((folder) => folder.color).filter(Boolean))];
+          return pastColors.length ? `
+            <div class="folder-color-swatches">
+              ${pastColors.map((color) => `<button type="button" class="folder-color-swatch" style="--swatch-color:${color}" data-pick-folder-color="${color}" title="${color}"></button>`).join("")}
+            </div>
+          ` : "";
+        })()}
         <button class="pill-button primary" type="submit">Create</button>
       </form>
     ` : ""}
@@ -1622,6 +1630,13 @@ function bindEvents() {
 
   document.querySelectorAll("[data-tab]").forEach((node) => {
     node.addEventListener("click", () => setState({ activeTab: node.dataset.tab, ...closeOpenForms() }));
+  });
+
+  document.querySelectorAll("[data-pick-folder-color]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const input = document.querySelector("#folder-color");
+      if (input) input.value = node.dataset.pickFolderColor;
+    });
   });
 
   document.querySelectorAll("[data-delete-kind]").forEach((node) => {
