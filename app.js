@@ -422,24 +422,13 @@ function calendarEventsOnDateKey(dateKey) {
   });
 }
 
-function isLuabubuProfile(profile) {
-  return !!profile && (profile.name || "").trim().toLowerCase() === "luabubu";
-}
-
-function isJonashiProfile(profile) {
-  return !!profile && (profile.name || "").trim().toLowerCase() === "jonashi";
-}
-
 function findProfileByName(name) {
   return state.profiles.find((profile) => (profile.name || "").trim().toLowerCase() === name);
 }
 
-// Period tracking is Lua's own data; Jonas only ever sees her days for awareness.
+// Each profile tracks and sees its own period days.
 function periodTrackingSourceProfile() {
-  const active = activeProfile();
-  if (isLuabubuProfile(active)) return active;
-  if (isJonashiProfile(active)) return findProfileByName("luabubu");
-  return null;
+  return activeProfile() || null;
 }
 
 function getPeriodStartDates(profileId) {
@@ -1077,7 +1066,7 @@ function renderCalendarDayDetail(dateKey) {
     ? (state.periodLogs || []).some((log) => log.profileId === sourceProfile.id && log.date === dateKey)
     : false;
   const isOvulationDay = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) === dateKey : false;
-  const canToggle = isLuabubuProfile(activeProfile());
+  const canToggle = !!sourceProfile && sourceProfile.id === activeProfile()?.id;
 
   const dayEvents = calendarEventsOnDateKey(dateKey);
   const eventRows = dayEvents.map((item) => `
@@ -1094,10 +1083,6 @@ function renderCalendarDayDetail(dateKey) {
       <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
         🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
       </button>
-    `;
-  } else if (sourceProfile && (isPeriodDay || isOvulationDay)) {
-    periodToggle = `
-      <div class="period-note">${isPeriodDay ? "🩸 Lua's period day" : "🥚 Lua's predicted ovulation day"}</div>
     `;
   }
 
@@ -2721,7 +2706,7 @@ async function deleteCalendarEvent(id) {
 async function togglePeriodDay() {
   const profile = activeProfile();
   const dateKey = state.selectedDay;
-  if (!profile || !dateKey || !isLuabubuProfile(profile)) return;
+  if (!profile || !dateKey) return;
   const existing = state.periodLogs.find((log) => log.profileId === profile.id && log.date === dateKey);
 
   if (existing) {
