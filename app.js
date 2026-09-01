@@ -807,6 +807,11 @@ function render() {
     return;
   }
   const profileStats = stats(profile.id);
+  const previousMain = document.querySelector(".main");
+  const scrollTop = previousMain ? previousMain.scrollTop : 0;
+  const windowScrollY = window.scrollY;
+  const previousTaskBank = document.querySelector(".schedule-task-bank");
+  const taskBankScrollTop = previousTaskBank ? previousTaskBank.scrollTop : 0;
   document.querySelector("#app").innerHTML = `
     <div class="app-shell">
       <div class="backdrop ${state.sidebarOpen ? "open" : ""}" data-action="close-sidebar"></div>
@@ -879,6 +884,11 @@ function render() {
   `;
 
   bindEvents();
+  const newMain = document.querySelector(".main");
+  if (newMain) newMain.scrollTop = scrollTop;
+  window.scrollTo(0, windowScrollY);
+  const newTaskBank = document.querySelector(".schedule-task-bank");
+  if (newTaskBank) newTaskBank.scrollTop = taskBankScrollTop;
 }
 
 function renderIntro() {
