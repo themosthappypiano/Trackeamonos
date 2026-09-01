@@ -1219,7 +1219,6 @@ function renderCalendar() {
       </div>
       <div class="counter">
         <button class="icon-button" title="Previous month" data-action="calendar-prev-month">&larr;</button>
-        <button class="pill-button" data-action="calendar-today">Today</button>
         <button class="icon-button" title="Next month" data-action="calendar-next-month">&rarr;</button>
         <button class="pill-button primary" data-action="toggle-event-form">+ Event</button>
         <button class="icon-button" title="${moonPhasesEnabled ? "Hide daily moon phases (full/new moon stay visible)" : "Show daily moon phases on this device"}" data-action="toggle-moon-phases">${moonPhasesEnabled ? "🌗" : "🌑"}</button>

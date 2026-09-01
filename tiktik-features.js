@@ -13,10 +13,23 @@ function tikTikState() {
   state.tikTik = {
     timers: {},
     schedule: {},
+    scheduleDay: today(),
     presence: null,
     ...(state.tikTik || {})
   };
   return state.tikTik;
+}
+
+// The day schedule is only meant to hold today's plan — once the clock rolls
+// past midnight, wipe it so yesterday's blocks don't linger into the new day.
+function ensureFreshSchedule() {
+  const data = tikTikState();
+  const day = today();
+  if (data.scheduleDay !== day) {
+    data.schedule = {};
+    data.scheduleDay = day;
+    persistTikTik();
+  }
 }
 
 function secondsToClock(seconds) {
@@ -92,7 +105,8 @@ function renderTikTikTimer() {
 function renderTikTikSchedule() {
   const profile = activeProfile();
   if (!profile) return "";
-  const tasks = byProfile(state.tasks).filter((task) => task.date <= today()).sort(compareTasks);
+  ensureFreshSchedule();
+  const tasks = byProfile(state.tasks).sort(compareTasks);
   const schedule = tikTikState().schedule;
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
@@ -101,7 +115,7 @@ function renderTikTikSchedule() {
   return `
     <div class="section-head"><div><h3>Day schedule</h3><span>Drag a task onto a time slot, then drag its bottom edge to extend how long it runs.</span></div><button class="pill-button" data-tiktik-action="clear-schedule">Clear day</button></div>
     <div class="schedule-workspace">
-      <aside class="schedule-task-bank"><strong>Unscheduled tasks</strong>${tasks.filter((task) => !schedule[task.id] && task.status !== "done").map((task) => `<button class="schedule-task-chip" draggable="true" data-schedule-task="${task.id}">${escapeHtml(task.title)}</button>`).join("") || `<span>Everything is scheduled.</span>`}</aside>
+      <aside class="schedule-task-bank"><strong>Unscheduled tasks</strong>${tasks.filter((task) => !schedule[task.id]).map((task) => `<button class="schedule-task-chip${task.status === "done" ? " done" : ""}" draggable="true" data-schedule-task="${task.id}">${escapeHtml(task.title)}</button>`).join("") || `<span>Everything is scheduled.</span>`}</aside>
       <div class="tiktik-timeline" style="height:${hours.length * TIKTIK_ROW_HEIGHT}px">
         ${hours.map((minute) => `<div class="schedule-hour" data-schedule-slot="${minute}" style="height:${TIKTIK_ROW_HEIGHT}px"><time>${minutesToTime(minute)}</time><div></div></div>`).join("")}
         <div class="schedule-overlay">
@@ -242,4 +256,8 @@ document.addEventListener("keydown", (event) => {
 // Keep a visible running timer fresh without disturbing the rest of the app.
 tikTikTicker = window.setInterval(() => {
   if (state.activeTab === "timer" && activeTimer(activeProfile()?.id)) render();
+  if (tikTikState().scheduleDay !== today()) {
+    ensureFreshSchedule();
+    if (state.activeTab === "schedule") render();
+  }
 }, 1000);

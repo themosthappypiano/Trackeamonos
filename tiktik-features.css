@@ -16,6 +16,7 @@
 .schedule-task-bank strong { font-size:13px; }
 .schedule-task-bank > span { color:var(--muted); font-size:12px; font-weight:700; }
 .schedule-task-chip, .scheduled-task { border:2px solid var(--line); border-radius:7px; background:var(--panel-soft); color:var(--ink); padding:8px; font-size:12px; font-weight:800; text-align:left; cursor:grab; }
+.schedule-task-chip.done { text-decoration:line-through; opacity:.7; }
 .tiktik-timeline { position:relative; overflow:hidden; }
 .schedule-hour { display:grid; grid-template-columns:58px minmax(0,1fr); border-bottom:1px solid var(--line); box-sizing:border-box; }
 .schedule-hour:last-child { border-bottom:0; }
