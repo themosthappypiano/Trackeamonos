@@ -1465,8 +1465,8 @@ function renderChecklist() {
               <span>${habit.count}/${habit.target} today</span>
             </div>
             <div class="check-row">
-              <button class="${pct >= 100 ? "active yes" : ""}" data-habit-count="${habit.id}:1">Yes</button>
-              <button class="${habit.count === 0 ? "active no" : ""}" data-habit-count="${habit.id}:-1">No</button>
+              <button class="${pct >= 100 ? "active yes" : ""}" data-habit-set="${habit.id}:yes">Yes</button>
+              <button class="${habit.count === 0 ? "active no" : ""}" data-habit-set="${habit.id}:no">No</button>
             </div>
           </article>
         `;
@@ -1718,16 +1718,19 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-habit-count]").forEach((node) => {
+  document.querySelectorAll("[data-habit-set]").forEach((node) => {
     node.addEventListener("click", () => {
-      const [id, delta] = node.dataset.habitCount.split(":");
+      const [id, answer] = node.dataset.habitSet.split(":");
       const profileId = activeProfile()?.id;
       const completedBefore = profileId ? allHabitsComplete(profileId) : false;
       const current = state.habits.find((habit) => habit.id === id);
       const habitWasComplete = current ? current.count >= current.target : false;
-      state.habits = state.habits.map((habit) => habit.id === id
-        ? { ...habit, count: Math.max(0, Math.min(habit.target, habit.count + Number(delta))) }
-        : habit);
+      state.habits = state.habits.map((habit) => {
+        if (habit.id !== id) return habit;
+        if (habit.target <= 1) return { ...habit, count: answer === "yes" ? 1 : 0 };
+        const delta = answer === "yes" ? 1 : -1;
+        return { ...habit, count: Math.max(0, Math.min(habit.target, habit.count + delta)) };
+      });
       const updated = state.habits.find((habit) => habit.id === id);
       const habitCompletedNow = updated ? !habitWasComplete && updated.count >= updated.target : false;
       const completedNow = profileId ? !completedBefore && allHabitsComplete(profileId) : false;
