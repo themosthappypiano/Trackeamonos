@@ -534,8 +534,7 @@ textarea {
 }
 
 .xp-line,
-.progress-line,
-.habit-meter {
+.progress-line {
   height: 10px;
   border-radius: 999px;
   background: #e7eee8;
@@ -550,13 +549,8 @@ textarea {
   width: var(--progress-width);
 }
 
-.habit-meter div {
-  width: var(--meter);
-}
-
 .xp-line div,
-.progress-line div,
-.habit-meter div {
+.progress-line div {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--green), var(--blue));

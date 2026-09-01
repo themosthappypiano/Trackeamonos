@@ -1455,7 +1455,6 @@ function renderChecklist() {
             <div class="item-title">
               <strong>${escapeHtml(habit.title)}</strong>
               <span>${habit.count}/${habit.target} today</span>
-              <div class="habit-meter" style="--meter:${pct}%"><div></div></div>
             </div>
             <div class="check-row">
               <button class="${pct >= 100 ? "active yes" : ""}" data-habit-count="${habit.id}:1">Yes</button>
