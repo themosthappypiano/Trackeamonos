@@ -152,7 +152,11 @@ function loadState() {
     if (!saved) return base;
     try {
       const parsed = JSON.parse(saved);
-      return { ...base, tikTik: { ...base.tikTik, ...(parsed.tikTik || {}) } };
+      return {
+        ...base,
+        activeProfileId: parsed.activeProfileId || base.activeProfileId,
+        tikTik: { ...base.tikTik, ...(parsed.tikTik || {}) }
+      };
     } catch {
       return base;
     }
