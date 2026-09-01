@@ -1186,7 +1186,6 @@ function renderCalendar() {
         </div>
         <div class="counter">
           <button class="icon-button" title="Previous month" data-action="calendar-prev-month">&larr;</button>
-          <button class="pill-button" data-action="calendar-today">Today</button>
           <button class="icon-button" title="Next month" data-action="calendar-next-month">&rarr;</button>
         </div>
       </div>
@@ -1793,7 +1792,6 @@ function handleAction(action) {
   if (action === "toggle-event-form") setState({ eventFormOpen: !state.eventFormOpen });
   if (action === "calendar-prev-month") setState({ calendarMonthOffset: (state.calendarMonthOffset || 0) - 1, selectedDay: null });
   if (action === "calendar-next-month") setState({ calendarMonthOffset: (state.calendarMonthOffset || 0) + 1, selectedDay: null });
-  if (action === "calendar-today") setState({ calendarMonthOffset: 0, selectedDay: null });
   if (action === "toggle-moon-phases") {
     moonPhasesEnabled = !moonPhasesEnabled;
     try {
