@@ -3,73 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Tik Tik — track your time. Own your day." />
-    <title>Tik Tik — Track your time. Own your day.</title>
+    <title>Traquea Monos</title>
     <link rel="icon" type="image/png" href="./assets/favicon.png" />
+    <link rel="apple-touch-icon" href="./assets/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./tiktik.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <a class="wordmark" href="#top" aria-label="Tik Tik home"><span class="mark">t</span>Tik Tik</a>
-      <nav aria-label="Main navigation"><a href="#features">Features</a><a href="#telegram">Telegram</a><a href="#pricing">Pricing</a></nav>
-      <a class="button small" href="#dashboard">Try it free</a>
-    </header>
-
-    <main id="top">
-      <section class="hero">
-        <p class="eyebrow">A calmer way to work</p>
-        <h1>Track your time.<br /><em>Own your day.</em></h1>
-        <p class="hero-copy">A minimal, keyboard-first time tracker with drag-and-drop scheduling, daily notes, and project management — all in one dashboard.</p>
-        <div class="hero-actions"><a class="button" href="#dashboard">Start your free trial <span>→</span></a><span>Free for 14 days · €9.99 once</span></div>
-        <p class="shortcut-hint"><kbd>⌘</kbd> <kbd>K</kbd> to add a task, anywhere in the dashboard</p>
-      </section>
-
-      <section class="dashboard-wrap" id="dashboard" aria-label="Interactive Tik Tik dashboard">
-        <div class="dashboard-topbar"><div class="window-controls"><i></i><i></i><i></i></div><span>Tuesday, September 1</span><div class="top-actions"><button data-action="focus-search" aria-label="Search">⌕</button><button data-action="toggle-shortcuts" aria-label="Keyboard shortcuts">?</button><button class="avatar" aria-label="Profile">JA</button></div></div>
-        <div class="dashboard">
-          <aside class="sidebar">
-            <div class="sidebar-brand"><span class="mark">t</span><strong>Tik Tik</strong></div>
-            <button class="nav-item active" data-view="today"><span>▦</span> Today</button>
-            <button class="nav-item" data-view="projects"><span>◫</span> Projects</button>
-            <button class="nav-item" data-view="archive"><span>⌁</span> Archive</button>
-            <div class="side-spacer"></div>
-            <div class="presence-card"><span class="presence-dot"></span><div><strong id="presence-status">Checked in</strong><small id="presence-time">Today, 09:02</small></div><button data-action="toggle-presence" title="Check out">↗</button></div>
-            <button class="nav-item muted" data-action="toggle-shortcuts"><span>⌘</span> Shortcuts</button>
-            <button class="nav-item muted"><span>⚙</span> Settings</button>
-          </aside>
-
-          <section class="workspace">
-            <div class="workspace-heading"><div><p class="eyebrow">Tuesday, September 1</p><h2>Good morning, Jonas.</h2></div><button class="button dark" data-action="new-task">+ New task</button></div>
-            <div class="stats-row"><article><span>Tracked today</span><strong id="tracked-total">03:03</strong><small>↑ 22% from yesterday</small></article><article><span>Tasks completed</span><strong id="completed-total">2 <i>/ 5</i></strong><small>Keep the momentum</small></article><article><span>Presence</span><strong id="presence-duration">04:18</strong><small>Checked in at 09:02</small></article></div>
-
-            <div class="content-grid">
-              <section class="panel task-panel"><div class="panel-head"><div><h3>Task Tracker</h3><p id="task-count">4 tasks</p></div><button class="icon-button" data-action="new-task" aria-label="Add task">+</button></div><div class="task-list" id="task-list"></div><button class="add-row" data-action="new-task">+ Add a task</button></section>
-              <section class="panel notes-panel"><div class="panel-head"><div><h3>Daily Notes</h3><p>Keep the day in context</p></div><button class="icon-button" data-action="archive-notes" title="Archive completed notes">⌄</button></div><div id="notes-list" class="notes-list"></div><button class="add-row" data-action="new-note">+ Add a note</button><p class="archive-note" id="archive-note">1 archived</p></section>
-            </div>
-
-            <section class="panel schedule-panel"><div class="panel-head"><div><h3>Schedule</h3><p>Today · drag tasks to move them</p></div><button class="text-button" data-action="now">Now</button></div><div class="schedule" id="schedule"><div class="time-labels"><span>9:00</span><span>10:00</span><span>11:00</span><span>12:00</span><span>13:00</span><span>14:00</span></div><div class="schedule-grid" id="schedule-grid"><div class="now-line"><span>10:24</span></div></div></div></section>
-          </section>
-        </div>
-        <div class="shortcut-modal" id="shortcut-modal" hidden><div><button class="modal-close" data-action="toggle-shortcuts">×</button><p class="eyebrow">Keyboard first</p><h3>Move at the speed of thought.</h3><dl><dt><kbd>⌘</kbd><kbd>K</kbd></dt><dd>Create a task</dd><dt><kbd>Space</kbd></dt><dd>Start or stop the selected timer</dd><dt><kbd>N</kbd></dt><dd>Add a daily note</dd><dt><kbd>?</kbd></dt><dd>Show these shortcuts</dd></dl></div></div>
-      </section>
-
-      <section class="feature-section" id="features"><div class="section-intro"><p class="eyebrow">One quiet place for the day</p><h2>Everything you need to stay focused</h2></div><div class="feature-grid"><article><b>01</b><h3>Time Tracking</h3><p>Start/stop timers, track tasks by project with color-coded entries and daily summaries.</p></article><article><b>02</b><h3>Day Schedule</h3><p>Visual timeline with drag-and-drop scheduling and a live current-time indicator.</p></article><article><b>03</b><h3>Daily Notes & Archive</h3><p>To-do checklist with confetti on completion and automatic archiving of done items.</p></article><article><b>04</b><h3>Project Management</h3><p>Organize tasks by projects, create inline, and view statistics at a glance.</p></article><article><b>05</b><h3>Presence Tracking</h3><p>Check in and out with daily presence duration calculated automatically.</p></article><article><b>06</b><h3>Keyboard Shortcuts</h3><p>Power-user shortcuts for fast navigation — no mouse required.</p></article></div></section>
-
-      <section class="problem-section"><div><p class="eyebrow">The cost of guessing</p><h2>Where does your time actually go?</h2><p>Most people overestimate their productive hours and underestimate how much time vanishes into context switching, quick checks, and low-value busywork. By the end of the week, you're left wondering — where did it all go?</p></div><div class="insight-list"><article><span>⌛</span><h3>2+ hours lost daily</h3><p>The average person loses over two hours every day to untracked context switching and distractions.</p></article><article><span>◫</span><h3>Friday amnesia</h3><p>By Friday, you've already forgotten where Monday went. Without data, you're guessing — not improving.</p></article><article><span>✦</span><h3>Patterns you never expected</h3><p>Simple tracking reveals surprising truths about where your attention really flows each week.</p></article></div><p class="closing-line">Tik Tik doesn't add complexity — it removes the guesswork. Start tracking, see the truth, take back your week.</p></section>
-
-      <section class="closer-look"><div class="section-intro"><p class="eyebrow">Designed for real work</p><h2>A closer look</h2></div><div class="look-card"><div class="mini-column"><div class="mini-title">Task Tracker <span>4 tasks</span></div><p><i class="dot coral"></i>Website Redesign</p><p>Homepage layout</p><p>Design system</p><p><i class="dot blue"></i>Mobile App</p><p>Auth flow</p><p>Push notifications</p></div><div class="mini-focus"><span>Homepage layout</span><strong>01:24:37</strong><div class="mini-progress"><i></i></div></div><div class="mini-schedule"><div class="mini-title">Schedule <span>Today</span></div><p>9:00</p><div class="mini-event coral">Design Review</div><p>10:00</p><div class="mini-event blue">Team Standup</div><p>11:00</p><div class="mini-event green">Deep Work</div><p>12:00</p></div></div></section>
-
-      <section class="telegram-section" id="telegram"><div><p class="eyebrow">No app switching</p><h2>Track from Telegram</h2><p>Link your Telegram username in settings, then use simple commands to manage tasks without ever leaving your chat.</p><div class="telegram-benefits"><article><b>⚡</b><div><h3>/task — instant tracking</h3><p>Type /task followed by a name. Pick a project from inline buttons and the timer starts immediately.</p></div></article><article><b>✋</b><div><h3>/finish — one-tap stop</h3><p>Running timers appear as buttons. Tap to stop — or stop all at once.</p></div></article><article><b>🔄</b><div><h3>Smart conflict handling</h3><p>If a timer is already running, the bot asks whether to stop it before starting the new one.</p></div></article></div></div><div class="telegram-chat"><header><span class="telegram-logo">✈</span><div><strong>Tik Tik Bot</strong><small>online</small></div></header><div class="message user">/task Design homepage</div><div class="message bot">Select project for “Design homepage”:<div><button>Website Redesign</button><button>Mobile App</button></div></div><div class="message user">Website Redesign</div><div class="message bot">✅ Task “Design homepage” created in Website Redesign — timer started!</div><footer>Message… <span>➤</span></footer></div></section>
-
-      <section class="pricing-section" id="pricing"><p class="eyebrow">Simple pricing</p><h2>14 days free, then €9.99 — once.</h2><p>No subscriptions. No hidden fees. Pay once, use forever.</p><div class="pricing-card"><div><span>Lifetime access</span><strong>€9.99</strong><small>One-time payment after your free trial</small></div><ul><li>14-day free trial — full access, no credit card required</li><li>Lifetime access to all features</li><li>Unlimited projects, tasks, and time entries</li><li>Telegram bot integration included</li></ul><a class="button" href="#dashboard">Start free for 14 days <span>→</span></a></div><small class="payment-note">Payments coming soon — early users get full access during the trial period.</small></section>
-
-      <section class="final-cta"><p class="eyebrow">Your time is yours</p><h2>Ready to take control of your time?</h2><p>Free to use. No credit card required.</p><a class="button light" href="#dashboard">Start your free trial <span>→</span></a></section>
-    </main>
-    <footer class="site-footer"><a class="wordmark" href="#top"><span class="mark">t</span>Tik Tik</a><span>© 2026 Tik Tik. All rights reserved.</span><a href="https://tiktik.app">tiktik.app</a></footer>
-    <div id="toast" role="status" aria-live="polite"></div>
-    <script src="./tiktik.js" type="module"></script>
+    <div id="app"></div>
+    <script src="./app.js" type="module"></script>
   </body>
 </html>
