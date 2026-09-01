@@ -138,7 +138,7 @@ const seed = {
   gratitude: [],
   periodLogs: [],
   calendarEvents: [],
-  tikTik: { timers: {}, schedule: {}, notes: [], archivedNotes: [], presence: null },
+  tikTik: { timers: {}, schedule: {}, presence: null },
   earnedXp: {}
 };
 
@@ -494,7 +494,7 @@ function uid(prefix) {
 }
 
 function tabLabel(tab) {
-  return { tasks: "Tasks", habits: "Habits", checklist: "Checklist", calendar: "Calendar", timer: "Track", schedule: "Schedule", notes: "Notes" }[tab];
+  return { tasks: "Tasks", habits: "Habits", checklist: "Checklist", calendar: "Calendar", timer: "Track", schedule: "Schedule" }[tab];
 }
 
 function normalizeChecklist(items) {
@@ -997,7 +997,7 @@ function renderGratitudeRecap() {
 function renderTabs() {
   return `
     <div class="tab-row">
-      ${["tasks", "timer", "schedule", "notes", "habits", "checklist", "calendar"].map((tab) => `
+      ${["tasks", "timer", "schedule", "habits", "checklist", "calendar"].map((tab) => `
         <button class="tab-button ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">
           ${tabLabel(tab)}
         </button>
@@ -1009,7 +1009,6 @@ function renderTabs() {
 function renderPanel() {
   if (state.activeTab === "timer") return typeof renderTikTikTimer === "function" ? renderTikTikTimer() : "";
   if (state.activeTab === "schedule") return typeof renderTikTikSchedule === "function" ? renderTikTikSchedule() : "";
-  if (state.activeTab === "notes") return typeof renderTikTikNotes === "function" ? renderTikTikNotes() : "";
   if (state.activeTab === "habits") return renderHabits();
   if (state.activeTab === "checklist") return renderChecklist();
   if (state.activeTab === "calendar") return renderCalendar();

@@ -24,10 +24,4 @@
 .schedule-now { position:absolute; z-index:2; left:0; right:0; border-top:2px dashed var(--red); color:var(--red); font-size:9px; font-style:normal; font-weight:900; transform:translateY(-50%); pointer-events:none; }
 .scheduled-task { width:100%; border-color:var(--blue); background:rgba(35,111,226,.12); }
 .scheduled-task small { float:right; color:var(--muted); font-size:10px; }
-.daily-notes-card { display:grid; gap:8px; }
-.daily-note { display:grid; grid-template-columns:22px minmax(0,1fr) 34px; align-items:center; gap:8px; padding:12px; border:2px solid var(--line); border-radius:8px; background:var(--panel); font-weight:750; }
-.daily-note input { width:17px; height:17px; accent-color:var(--green); }
-.daily-note.done span { color:var(--muted); text-decoration:line-through; }
-.daily-note button { border:0; background:transparent; color:var(--muted); font-size:19px; }
-.archive-count { margin:0; text-align:right; }
 @media (max-width:620px) { .tiktik-summary-grid, .schedule-workspace { grid-template-columns:1fr; } .timer-now { align-items:flex-start; flex-direction:column; } }

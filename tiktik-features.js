@@ -10,8 +10,6 @@ function tikTikState() {
   state.tikTik = {
     timers: {},
     schedule: {},
-    notes: [],
-    archivedNotes: [],
     presence: null,
     ...(state.tikTik || {})
   };
@@ -109,20 +107,6 @@ function renderTikTikSchedule() {
     </div>`;
 }
 
-function renderTikTikNotes() {
-  const profile = activeProfile();
-  if (!profile) return "";
-  const data = tikTikState();
-  const notes = data.notes.filter((note) => note.profileId === profile.id && note.day === today());
-  const archived = data.archivedNotes.filter((note) => note.profileId === profile.id).length;
-  return `
-    <div class="section-head"><div><h3>Daily notes</h3><span>A lightweight checklist for what you want to remember today.</span></div><button class="pill-button primary" data-tiktik-action="add-note">+ Note</button></div>
-    <section class="daily-notes-card">
-      ${notes.length ? notes.map((note) => `<label class="daily-note ${note.done ? "done" : ""}"><input type="checkbox" data-note-id="${note.id}" ${note.done ? "checked" : ""}/><span>${escapeHtml(note.text)}</span><button type="button" data-tiktik-action="archive-note" data-note-id="${note.id}" title="Archive note">⌄</button></label>`).join("") : `<div class="empty">Nothing here yet. Add a note, a thought, or a small promise for today.</div>`}
-    </section>
-    <p class="archive-count">${archived} archived note${archived === 1 ? "" : "s"}</p>`;
-}
-
 function persistTikTik() { saveState(); }
 
 function toggleTikTikTimer(taskId) {
@@ -170,26 +154,6 @@ function togglePresence() {
   render();
 }
 
-function addTikTikNote() {
-  const text = window.prompt("Daily note");
-  const profile = activeProfile();
-  if (!profile || !text?.trim()) return;
-  tikTikState().notes.push({ id: uid("note"), profileId: profile.id, day: today(), text: text.trim(), done: false });
-  persistTikTik();
-  render();
-}
-
-function archiveTikTikNote(id) {
-  const data = tikTikState();
-  const note = data.notes.find((item) => item.id === id);
-  if (!note) return;
-  data.notes = data.notes.filter((item) => item.id !== id);
-  data.archivedNotes.push({ ...note, archivedAt: new Date().toISOString() });
-  persistTikTik();
-  render();
-  notify("Note archived.");
-}
-
 function bindTikTikEvents() {
   document.querySelectorAll("[data-tiktik-action]").forEach((node) => node.addEventListener("click", (event) => {
     event.preventDefault();
@@ -197,21 +161,7 @@ function bindTikTikEvents() {
     if (action === "toggle-timer") toggleTikTikTimer(node.dataset.taskId);
     if (action === "stop-timer") { const current = activeTimer(activeProfile()?.id); if (current) toggleTikTikTimer(current[0]); }
     if (action === "toggle-presence") togglePresence();
-    if (action === "add-note") addTikTikNote();
-    if (action === "archive-note") archiveTikTikNote(node.dataset.noteId);
     if (action === "clear-schedule") { tikTikState().schedule = {}; persistTikTik(); render(); notify("Schedule cleared."); }
-  }));
-  document.querySelectorAll("[data-note-id]").forEach((node) => node.addEventListener("change", () => {
-    const note = tikTikState().notes.find((item) => item.id === node.dataset.noteId);
-    if (!note) return;
-    note.done = node.checked;
-    persistTikTik();
-    if (note.done) {
-      notify("Note completed.", { gif: true });
-      window.setTimeout(() => archiveTikTikNote(note.id), 550);
-      return;
-    }
-    render();
   }));
   document.querySelectorAll("[data-schedule-task]").forEach((node) => node.addEventListener("dragstart", (event) => event.dataTransfer.setData("text/plain", node.dataset.scheduleTask)));
   document.querySelectorAll("[data-schedule-slot]").forEach((node) => {
@@ -236,7 +186,6 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key.toLowerCase() === "t") setState({ activeTab: "timer", ...closeOpenForms() });
   if (event.key.toLowerCase() === "s") setState({ activeTab: "schedule", ...closeOpenForms() });
-  if (event.key.toLowerCase() === "n") setState({ activeTab: "notes", ...closeOpenForms() });
   if (event.code === "Space" && state.activeTab === "timer") {
     event.preventDefault();
     const running = activeTimer(activeProfile()?.id);
