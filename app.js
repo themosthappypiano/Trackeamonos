@@ -812,6 +812,10 @@ function render() {
   const windowScrollY = window.scrollY;
   const previousTaskBank = document.querySelector(".schedule-task-bank");
   const taskBankScrollTop = previousTaskBank ? previousTaskBank.scrollTop : 0;
+  const previousPanelBody = document.querySelector(".panel-body");
+  const panelBodyScrollTop = previousPanelBody ? previousPanelBody.scrollTop : 0;
+  const previousOverview = document.querySelector(".overview");
+  const overviewScrollTop = previousOverview ? previousOverview.scrollTop : 0;
   document.querySelector("#app").innerHTML = `
     <div class="app-shell">
       <div class="backdrop ${state.sidebarOpen ? "open" : ""}" data-action="close-sidebar"></div>
@@ -889,6 +893,10 @@ function render() {
   window.scrollTo(0, windowScrollY);
   const newTaskBank = document.querySelector(".schedule-task-bank");
   if (newTaskBank) newTaskBank.scrollTop = taskBankScrollTop;
+  const newPanelBody = document.querySelector(".panel-body");
+  if (newPanelBody) newPanelBody.scrollTop = panelBodyScrollTop;
+  const newOverview = document.querySelector(".overview");
+  if (newOverview) newOverview.scrollTop = overviewScrollTop;
 }
 
 function renderIntro() {
