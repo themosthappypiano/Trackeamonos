@@ -1459,7 +1459,7 @@ function renderChecklist() {
             </div>
             <div class="counter">
               <button class="icon-button" data-habit-count="${habit.id}:-1">−</button>
-              <b>${pct}%</b>
+              <span class="habit-status ${pct >= 100 ? "done" : ""}">${pct >= 100 ? "Yes" : "No"}</span>
               <button class="icon-button primary" data-habit-count="${habit.id}:1">+</button>
             </div>
           </article>
