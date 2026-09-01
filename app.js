@@ -126,6 +126,7 @@ const seed = {
   openFolderId: null,
   gratitudeOpen: false,
   calendarSearch: "",
+  calendarMonthOffset: 0,
   selectedDay: null,
   eventFormOpen: false,
   profiles: [],
@@ -1146,9 +1147,10 @@ function renderCalendarDayDetail(dateKey) {
 
 function renderCalendar() {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const monthLabel = now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const viewDate = new Date(now.getFullYear(), now.getMonth() + (state.calendarMonthOffset || 0), 1);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthLabel = viewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayDate = now.getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -1197,6 +1199,11 @@ function renderCalendar() {
           <h3>Calendar</h3>
           <span>${monthLabel}</span>
         </div>
+        <div class="counter">
+          <button class="icon-button" title="Previous month" data-action="calendar-prev-month">&larr;</button>
+          <button class="pill-button" data-action="calendar-today">Today</button>
+          <button class="icon-button" title="Next month" data-action="calendar-next-month">&rarr;</button>
+        </div>
       </div>
       <input id="calendar-search" class="calendar-search" type="search" placeholder="Search a habit for its monthly count, or a task for upcoming dates…" value="${escapeHtml(state.calendarSearch || "")}" />
       ${hasResults
@@ -1212,6 +1219,9 @@ function renderCalendar() {
         <span>${monthLabel}</span>
       </div>
       <div class="counter">
+        <button class="icon-button" title="Previous month" data-action="calendar-prev-month">&larr;</button>
+        <button class="pill-button" data-action="calendar-today">Today</button>
+        <button class="icon-button" title="Next month" data-action="calendar-next-month">&rarr;</button>
         <button class="pill-button primary" data-action="toggle-event-form">+ Event</button>
         <button class="icon-button" title="${moonPhasesEnabled ? "Hide daily moon phases (full/new moon stay visible)" : "Show daily moon phases on this device"}" data-action="toggle-moon-phases">${moonPhasesEnabled ? "🌗" : "🌑"}</button>
       </div>
@@ -1796,6 +1806,9 @@ function handleAction(action) {
   if (action === "save-gratitude") saveGratitude();
   if (action === "toggle-period-day") togglePeriodDay();
   if (action === "toggle-event-form") setState({ eventFormOpen: !state.eventFormOpen });
+  if (action === "calendar-prev-month") setState({ calendarMonthOffset: (state.calendarMonthOffset || 0) - 1, selectedDay: null });
+  if (action === "calendar-next-month") setState({ calendarMonthOffset: (state.calendarMonthOffset || 0) + 1, selectedDay: null });
+  if (action === "calendar-today") setState({ calendarMonthOffset: 0, selectedDay: null });
   if (action === "toggle-moon-phases") {
     moonPhasesEnabled = !moonPhasesEnabled;
     try {
