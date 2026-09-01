@@ -7,6 +7,7 @@
   --line: #242d28;
   --green: #4fa87f;
   --blue: #236fe2;
+  --light-blue: #bcd9fb;
   --red: #f05c45;
   --yellow: #e0ac4a;
   --pink: #f28db2;
@@ -27,6 +28,7 @@ body.dark {
   --line: #30363d;
   --green: #357a5b;
   --blue: #6a95d6;
+  --light-blue: #33445c;
   --red: #d9695f;
   --yellow: #b58a48;
   --pink: #cf82a8;
@@ -775,6 +777,12 @@ textarea {
   box-shadow: 0 0 0 1px var(--line);
 }
 
+.day-box.predicted-period {
+  position: relative;
+  outline: 2px solid var(--light-blue);
+  outline-offset: 1px;
+}
+
 .day-box.birthday {
   border-color: var(--yellow);
 }
@@ -809,6 +817,7 @@ textarea {
 
 .legend-dot.period { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
 .legend-dot.ovulation { border-color: #ffffff; box-shadow: 0 0 0 1px var(--line); }
+.legend-dot.predicted-period { border-color: var(--light-blue); box-shadow: 0 0 0 1px var(--light-blue); }
 .legend-dot.birthday { border-color: var(--yellow); }
 .legend-dot.event { border-color: var(--yellow); }
 

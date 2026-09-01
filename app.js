@@ -449,6 +449,15 @@ function getPeriodStartDates(profileId) {
   return dates.filter((date, index) => index === 0 || dateKeyDiffDays(date, dates[index - 1]) > 1);
 }
 
+// Predicts the next period start from the last logged start date, assuming a
+// fixed 28-day cycle (not the averaged cycle length used for ovulation).
+function getPredictedPeriodDate(profileId) {
+  const starts = getPeriodStartDates(profileId);
+  if (!starts.length) return null;
+  const lastStart = starts[starts.length - 1];
+  return addDaysToDateKey(lastStart, 28);
+}
+
 // Predicts the upcoming ovulation day from logged period start dates: ~14 days
 // before the next expected period, using the average cycle length if known.
 function getPredictedOvulationDate(profileId) {
@@ -1219,6 +1228,7 @@ function renderCalendar() {
       ${periodTrackingSourceProfile() ? `
         <span><i class="legend-dot period"></i> Period</span>
         <span><i class="legend-dot ovulation"></i> Ovulation</span>
+        <span><i class="legend-dot predicted-period"></i> Predicted period</span>
       ` : ""}
       <span><i class="legend-dot event"></i> Event</span>
       <span>🌕 Full moon · 🌑 New moon${moonPhasesEnabled ? " · other phases shown daily (this device only)" : ""}</span>
@@ -1234,10 +1244,12 @@ function renderCalendar() {
           ? new Set((state.periodLogs || []).filter((log) => log.profileId === sourceProfile.id).map((log) => log.date))
           : new Set();
         const ovulationDate = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) : null;
+        const predictedPeriodDate = sourceProfile ? getPredictedPeriodDate(sourceProfile.id) : null;
         return daysArray.map((day) => {
           const dateKey = dateKeyForDay(day);
           const isPeriodDay = periodDates.has(dateKey);
           const isOvulationDay = !isPeriodDay && ovulationDate === dateKey;
+          const isPredictedPeriodDay = !isPeriodDay && predictedPeriodDate === dateKey;
           const dayEvents = calendarEventsOnDateKey(dateKey);
           const hasBirthday = dayEvents.some((item) => item.type === "birthday");
           const hasEvent = dayEvents.some((item) => item.type === "event");
@@ -1246,6 +1258,7 @@ function renderCalendar() {
           const titleParts = [
             isPeriodDay ? "Period day" : "",
             isOvulationDay ? "Predicted ovulation day" : "",
+            isPredictedPeriodDay ? "Predicted period day (28-day cycle)" : "",
             ...dayEvents.map((item) => item.type === "birthday" ? `🎂 ${item.title}` : `📌 ${item.title}`),
             showMoon ? moonPhase.label : ""
           ].filter(Boolean);
@@ -1255,6 +1268,7 @@ function renderCalendar() {
             dateKey === state.selectedDay ? "selected" : "",
             isPeriodDay ? "period" : "",
             isOvulationDay ? "ovulation" : "",
+            isPredictedPeriodDay ? "predicted-period" : "",
             hasBirthday ? "birthday" : "",
             hasEvent ? "event" : ""
           ].filter(Boolean).join(" ");
