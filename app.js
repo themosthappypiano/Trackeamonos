@@ -1727,9 +1727,10 @@ function bindEvents() {
       const habitWasComplete = current ? current.count >= current.target : false;
       state.habits = state.habits.map((habit) => {
         if (habit.id !== id) return habit;
-        if (habit.target <= 1) return { ...habit, count: answer === "yes" ? 1 : 0 };
-        const delta = answer === "yes" ? 1 : -1;
-        return { ...habit, count: Math.max(0, Math.min(habit.target, habit.count + delta)) };
+        if (answer === "yes") {
+          return { ...habit, count: habit.count >= habit.target ? 0 : habit.target <= 1 ? 1 : habit.count + 1 };
+        }
+        return { ...habit, count: habit.target <= 1 ? 0 : Math.max(0, habit.count - 1) };
       });
       const updated = state.habits.find((habit) => habit.id === id);
       const habitCompletedNow = updated ? !habitWasComplete && updated.count >= updated.target : false;
@@ -1744,7 +1745,9 @@ function bindEvents() {
   document.querySelectorAll("[data-check]").forEach((node) => {
     node.addEventListener("click", () => {
       const [id, value] = node.dataset.check.split(":");
-      const answer = value === "true";
+      const tapped = value === "true";
+      const current = state.checklist.find((item) => item.id === id);
+      const answer = current?.answer === tapped ? null : tapped;
       state.checklist = state.checklist.map((item) => item.id === id ? { ...item, answer } : item);
       const updated = state.checklist.find((item) => item.id === id);
       saveState();
@@ -2321,6 +2324,14 @@ async function persistHabitLog(habit) {
 async function persistChecklistLog(item, answer) {
   if (!isUuid(item.id) || !isUuid(item.profileId)) return;
   try {
+    if (answer === null) {
+      await supabaseRequest("daily_checklist_logs", {
+        method: "DELETE",
+        query: `?checklist_item_id=eq.${item.id}&log_date=eq.${today()}`,
+        prefer: "return=minimal"
+      });
+      return;
+    }
     await supabaseRequest("daily_checklist_logs", {
       method: "POST",
       query: "?on_conflict=checklist_item_id,log_date",
