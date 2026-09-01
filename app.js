@@ -1035,7 +1035,7 @@ function renderGratitudeRecap() {
 function renderTabs() {
   return `
     <div class="tab-row">
-      ${["tasks", "timer", "schedule", "checklist", "calendar"].map((tab) => `
+      ${["tasks", "schedule", "timer", "checklist", "calendar"].map((tab) => `
         <button class="tab-button ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">
           ${tabLabel(tab)}
         </button>

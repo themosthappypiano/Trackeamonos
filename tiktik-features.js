@@ -104,7 +104,10 @@ function renderTikTikTimer() {
   return `
     <div class="section-head">
       <div><h3>Time tracker</h3><span>Track tasks without leaving your existing workflow.</span></div>
-      <button class="pill-button primary" data-tiktik-action="toggle-presence">${presence?.profileId === profile.id && presence?.checkedInAt ? "Check out" : "Check in"}</button>
+      <div class="counter">
+        <button class="pill-button" data-tiktik-action="reset-timers">Reset</button>
+        <button class="pill-button primary" data-tiktik-action="toggle-presence">${presence?.profileId === profile.id && presence?.checkedInAt ? "Check out" : "Check in"}</button>
+      </div>
     </div>
     <section class="tiktik-summary-grid">
       <article><strong>${secondsToClock(currentTimerTotal(profile.id))}</strong><span>tracked today</span></article>
@@ -221,6 +224,18 @@ function bindTikTikEvents() {
     if (action === "stop-timer") { const current = activeTimer(activeProfile()?.id); if (current) toggleTikTikTimer(current[0]); }
     if (action === "toggle-presence") togglePresence();
     if (action === "clear-schedule") { tikTikState().schedule = {}; persistTikTik(); render(); notify("Schedule cleared."); }
+    if (action === "reset-timers") {
+      const profile = activeProfile();
+      if (!profile) return;
+      const data = tikTikState();
+      Object.keys(data.timers).forEach((taskId) => {
+        if (data.timers[taskId].profileId === profile.id && data.timers[taskId].day === today()) delete data.timers[taskId];
+      });
+      if (data.presence?.profileId === profile.id) data.presence = null;
+      persistTikTik();
+      render();
+      notify("Time tracker reset.");
+    }
   }));
   document.querySelectorAll("[data-schedule-task]").forEach((node) => node.addEventListener("dragstart", (event) => event.dataTransfer.setData("text/plain", node.dataset.scheduleTask)));
   document.querySelectorAll("[data-schedule-slot]").forEach((node) => {
