@@ -2,8 +2,8 @@
 // This stays deliberately local to the current browser so it never changes
 // existing profiles, habits, checklist records, folders, or Supabase tables.
 
-const TIKTIK_DAY_START = 8 * 60;
-const TIKTIK_DAY_END = 20 * 60;
+const TIKTIK_DAY_START = 6 * 60;
+const TIKTIK_DAY_END = 24 * 60;
 const TIKTIK_ROW_HEIGHT = 60;
 const TIKTIK_MIN_DURATION = 30;
 let tikTikTicker = null;
@@ -137,7 +137,7 @@ function renderTikTikSchedule() {
   const schedule = tikTikState().schedule;
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
-  const hours = Array.from({ length: 13 }, (_, index) => TIKTIK_DAY_START + index * 60);
+  const hours = Array.from({ length: (TIKTIK_DAY_END - TIKTIK_DAY_START) / 60 + 1 }, (_, index) => TIKTIK_DAY_START + index * 60);
   const scheduled = tasks.filter((task) => schedule[task.id]);
   return `
     <div class="section-head"><div><h3>Day schedule</h3><span>Drag a task onto a time slot, then drag its bottom edge to extend how long it runs.</span></div><button class="pill-button" data-tiktik-action="clear-schedule">Clear day</button></div>
