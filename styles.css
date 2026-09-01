@@ -1507,6 +1507,34 @@ textarea {
     padding: 0 7px;
     font-size: 13px;
   }
+
+  .calendar-weekdays {
+    gap: 3px;
+  }
+
+  .calendar-weekdays span {
+    font-size: 9px;
+  }
+
+  .calendar-grid {
+    gap: 3px;
+    padding: 8px;
+  }
+
+  .day-box {
+    padding: 6px 2px;
+    font-size: 12px;
+    gap: 1px;
+  }
+
+  .day-box .moon-phase {
+    font-size: 9px;
+  }
+
+  .calendar-legend {
+    gap: 6px 10px;
+    font-size: 10px;
+  }
 }
 
 @media (min-width: 981px) {
