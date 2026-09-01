@@ -1,15 +1,21 @@
-# Trackeamonos
+# Tik Tik
 
-Static tracking app for shared profiles, tasks, habits, end-of-day checklist items, gratitude, XP, and streaks.
+A static Tik Tik product site and interactive time-tracking dashboard, hosted from the Trackeamonos repository.
+
+The live page includes:
+
+- The complete Tik Tik marketing page: positioning, focus problem, feature set, Telegram flow, pricing, and calls to action.
+- An interactive dashboard demo with timers, time totals, projects, daily notes, completed-note archiving, presence check-in/out, drag-and-drop schedule blocks, and keyboard shortcuts.
+- Browser-local demo persistence through `localStorage`; no database migration is required for this release.
 
 ## Files
 
-- `index.html`, `styles.css`, `app.js`: the static app
-- `supabase/schema.sql`: Supabase tables and prototype RLS policies
-- `render.yaml`: Render static-site config
-- `loads/app-logo.jpg`: app logo
+- `index.html`: Tik Tik product page and dashboard markup
+- `tiktik.css`: responsive product/dashboard styling
+- `tiktik.js`: dashboard demo interactions and local persistence
+- `app.js`, `styles.css`, `supabase/`: retained legacy Trackeamonos tracker source and schema history
 
-## Local Preview
+## Local preview
 
 ```bash
 python3 -m http.server 4173
@@ -17,31 +23,9 @@ python3 -m http.server 4173
 
 Open `http://127.0.0.1:4173/`.
 
-## Supabase
-
-Run `supabase/schema.sql` in the Supabase SQL editor before using real data. The current prototype uses public read/write policies and should be tightened before production.
-
-For an existing database, apply `supabase/add-task-sort-order.sql` instead. It
-adds and backfills `tasks.sort_order`, assigns new tasks safely, and installs a
-transactional reorder RPC without changing `created_at`.
-
-### Reorder tasks through the REST API
-
-Send the complete ordered list of task UUIDs for exactly one profile:
+## Verification
 
 ```bash
-curl "$SUPABASE_URL/rest/v1/rpc/reorder_tasks" \
-  -H "apikey: $SUPABASE_KEY" \
-  -H "Authorization: Bearer $SUPABASE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "profile_id": "PROFILE_UUID",
-    "ordered_task_ids": ["FIRST_TASK_UUID", "SECOND_TASK_UUID"]
-  }'
+node --check tiktik.js
+node --test tests/task-order.test.js
 ```
-
-The list must contain every task belonging to the profile exactly once. The RPC
-runs as the caller (`SECURITY INVOKER`), so existing task RLS policies apply. It
-serializes inserts and reorders per profile, validates membership, and updates
-the complete order in one transaction. Use an authenticated user's access token
-in a browser; keep the service-role key only in trusted server-side tooling.
