@@ -137,6 +137,7 @@ const seed = {
   checklist: [],
   checklistLogs: [],
   gratitude: [],
+  gratitudeShuffle: {},
   periodLogs: [],
   calendarEvents: [],
   tikTik: { timers: {}, schedule: {}, presence: null },
@@ -1010,7 +1011,8 @@ function latestGratitudeByName(name) {
     .filter((item) => item.profileId === owner.id && item.text && item.text.trim())
     .sort((a, b) => b.date.localeCompare(a.date));
   if (!entries.length) return null;
-  const index = hashString(`${today()}:${owner.id}`) % entries.length;
+  const shuffleSeed = (state.gratitudeShuffle || {})[owner.id] || "";
+  const index = hashString(`${today()}:${owner.id}:${shuffleSeed}`) % entries.length;
   return { name: owner.name, date: entries[index].date, text: entries[index].text };
 }
 
@@ -2683,6 +2685,7 @@ async function saveGratitude() {
   } else {
     state.gratitude.push({ id: uid("gratitude"), profileId: activeProfile().id, date: today(), text });
   }
+  state.gratitudeShuffle = { ...(state.gratitudeShuffle || {}), [activeProfile().id]: uid("shuffle") };
   const profile = activeProfile();
   if (isUuid(profile.id)) {
     try {
