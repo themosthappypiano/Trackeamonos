@@ -67,7 +67,7 @@ function secondsToClock(seconds) {
 }
 
 function minutesToTime(minutes) {
-  const hour = Math.floor(minutes / 60);
+  const hour = Math.floor(minutes / 60) % 24;
   const minute = minutes % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
