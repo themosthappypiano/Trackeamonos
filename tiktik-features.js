@@ -32,6 +32,32 @@ function ensureFreshSchedule() {
   }
 }
 
+// Schedule/timer entries are keyed by task id in local-only storage, so a
+// task deleted before this cleanup existed (or deleted on another device)
+// leaves a dangling entry here forever unless we prune against the live
+// task list on every render.
+function pruneOrphanedTikTikEntries() {
+  const data = tikTikState();
+  const existingIds = new Set(state.tasks.map((task) => task.id));
+  let changed = false;
+  for (const id of Object.keys(data.schedule)) {
+    if (!existingIds.has(id)) { delete data.schedule[id]; changed = true; }
+  }
+  for (const id of Object.keys(data.timers)) {
+    if (!existingIds.has(id)) { delete data.timers[id]; changed = true; }
+  }
+  if (changed) persistTikTik();
+}
+
+function formatDurationMinutes(totalMinutes) {
+  const mins = Math.max(1, Math.round(totalMinutes));
+  const hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes}m`;
+}
+
 function secondsToClock(seconds) {
   const total = Math.max(0, Math.floor(seconds || 0));
   const hours = Math.floor(total / 3600);
@@ -106,6 +132,7 @@ function renderTikTikSchedule() {
   const profile = activeProfile();
   if (!profile) return "";
   ensureFreshSchedule();
+  pruneOrphanedTikTikEntries();
   const tasks = byProfile(state.tasks).sort(compareTasks);
   const schedule = tikTikState().schedule;
   const now = new Date();
@@ -124,8 +151,12 @@ function renderTikTikSchedule() {
             const duration = entry.duration || TIKTIK_MIN_DURATION;
             const top = ((entry.start - TIKTIK_DAY_START) / 60) * TIKTIK_ROW_HEIGHT;
             const height = (duration / 60) * TIKTIK_ROW_HEIGHT;
+            const actualSeconds = task.status === "done" ? elapsedForTimer(tikTikState().timers[task.id]) : 0;
+            const timeLabel = actualSeconds > 0
+              ? `Took ${formatDurationMinutes(actualSeconds / 60)}`
+              : `${minutesToTime(entry.start)}–${minutesToTime(entry.start + duration)}`;
             return `<div class="scheduled-block${task.status === "done" ? " done" : ""}" draggable="true" data-schedule-task="${task.id}" style="top:${top}px;height:${height}px">
-              <span>${escapeHtml(task.title)}</span><small>${minutesToTime(entry.start)}–${minutesToTime(entry.start + duration)}</small>
+              <span>${escapeHtml(task.title)}</span><small>${timeLabel}</small>
               <i class="schedule-resize-handle" data-resize-task="${task.id}"></i>
             </div>`;
           }).join("")}
