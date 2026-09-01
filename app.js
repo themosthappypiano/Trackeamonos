@@ -2326,6 +2326,11 @@ async function deleteItem(kind, id) {
   if (kind === "tasks" && deletedTask?.folderId) {
     await pruneFolderIfEmpty(deletedTask.folderId);
   }
+  if (kind === "tasks" && typeof tikTikState === "function") {
+    const tikTik = tikTikState();
+    delete tikTik.schedule[id];
+    delete tikTik.timers[id];
+  }
   saveState();
   render();
   notify("Item deleted.");
