@@ -4,7 +4,10 @@
 
 const TIKTIK_DAY_START = 8 * 60;
 const TIKTIK_DAY_END = 20 * 60;
+const TIKTIK_ROW_HEIGHT = 60;
+const TIKTIK_MIN_DURATION = 30;
 let tikTikTicker = null;
+let tikTikResize = null;
 
 function tikTikState() {
   state.tikTik = {
@@ -79,7 +82,7 @@ function renderTikTikTimer() {
         const isRunning = !!timer?.running;
         const project = byProfile(state.folders).find((folder) => folder.id === task.folderId);
         return `<article class="task-item ${isRunning ? "in_progress" : "ready"}">
-          <div class="item-title"><strong>${escapeHtml(task.title)}</strong><span>${project ? `Project · ${escapeHtml(project.name)}` : "No project"}${schedule[task.id] ? ` · Scheduled ${minutesToTime(schedule[task.id].start)}` : ""}</span></div>
+          <div class="item-title"><strong>${escapeHtml(task.title)}</strong><span>${project ? `Project · ${escapeHtml(project.name)}` : "No project"}${schedule[task.id] ? ` · Scheduled ${minutesToTime(schedule[task.id].start)}–${minutesToTime(schedule[task.id].start + (schedule[task.id].duration || TIKTIK_MIN_DURATION))}` : ""}</span></div>
           <button class="pill-button ${isRunning ? "primary" : ""}" data-tiktik-action="toggle-timer" data-task-id="${task.id}">${isRunning ? "■ Stop" : `▶ ${secondsToClock(elapsedForTimer(timer))}`}</button>
         </article>`;
       }).join("") : `<div class="empty">No active tasks for today. Add one in Tasks, then return here to time it.</div>`}
@@ -94,15 +97,26 @@ function renderTikTikSchedule() {
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
   const hours = Array.from({ length: 13 }, (_, index) => TIKTIK_DAY_START + index * 60);
+  const scheduled = tasks.filter((task) => schedule[task.id]);
   return `
-    <div class="section-head"><div><h3>Day schedule</h3><span>Drag a task onto a time slot to schedule it.</span></div><button class="pill-button" data-tiktik-action="clear-schedule">Clear day</button></div>
+    <div class="section-head"><div><h3>Day schedule</h3><span>Drag a task onto a time slot, then drag its bottom edge to extend how long it runs.</span></div><button class="pill-button" data-tiktik-action="clear-schedule">Clear day</button></div>
     <div class="schedule-workspace">
       <aside class="schedule-task-bank"><strong>Unscheduled tasks</strong>${tasks.filter((task) => !schedule[task.id]).map((task) => `<button class="schedule-task-chip" draggable="true" data-schedule-task="${task.id}">${escapeHtml(task.title)}</button>`).join("") || `<span>Everything is scheduled.</span>`}</aside>
-      <div class="tiktik-timeline">
-        ${hours.map((minute) => {
-          const entries = tasks.filter((task) => schedule[task.id] && Math.floor(schedule[task.id].start / 60) === Math.floor(minute / 60));
-          return `<div class="schedule-hour" data-schedule-slot="${minute}"><time>${minutesToTime(minute)}</time><div>${entries.map((task) => `<button class="scheduled-task" draggable="true" data-schedule-task="${task.id}">${escapeHtml(task.title)} <small>${minutesToTime(schedule[task.id].start)}</small></button>`).join("")}${currentMinute >= minute && currentMinute < minute + 60 ? `<i class="schedule-now" style="top:${((currentMinute - minute) / 60) * 100}%">Now</i>` : ""}</div></div>`;
-        }).join("")}
+      <div class="tiktik-timeline" style="height:${hours.length * TIKTIK_ROW_HEIGHT}px">
+        ${hours.map((minute) => `<div class="schedule-hour" data-schedule-slot="${minute}" style="height:${TIKTIK_ROW_HEIGHT}px"><time>${minutesToTime(minute)}</time><div></div></div>`).join("")}
+        <div class="schedule-overlay">
+          ${scheduled.map((task) => {
+            const entry = schedule[task.id];
+            const duration = entry.duration || TIKTIK_MIN_DURATION;
+            const top = ((entry.start - TIKTIK_DAY_START) / 60) * TIKTIK_ROW_HEIGHT;
+            const height = (duration / 60) * TIKTIK_ROW_HEIGHT;
+            return `<div class="scheduled-block" draggable="true" data-schedule-task="${task.id}" style="top:${top}px;height:${height}px">
+              <span>${escapeHtml(task.title)}</span><small>${minutesToTime(entry.start)}–${minutesToTime(entry.start + duration)}</small>
+              <i class="schedule-resize-handle" data-resize-task="${task.id}"></i>
+            </div>`;
+          }).join("")}
+          ${currentMinute >= TIKTIK_DAY_START && currentMinute < TIKTIK_DAY_END ? `<i class="schedule-now" style="top:${((currentMinute - TIKTIK_DAY_START) / 60) * TIKTIK_ROW_HEIGHT}px">Now</i>` : ""}
+        </div>
       </div>
     </div>`;
 }
@@ -170,10 +184,41 @@ function bindTikTikEvents() {
       event.preventDefault();
       const taskId = event.dataTransfer.getData("text/plain");
       if (!taskId) return;
-      tikTikState().schedule[taskId] = { start: Number(node.dataset.scheduleSlot), duration: 30 };
+      const existing = tikTikState().schedule[taskId];
+      tikTikState().schedule[taskId] = { start: Number(node.dataset.scheduleSlot), duration: existing?.duration || TIKTIK_MIN_DURATION * 2 };
       persistTikTik();
       render();
       notify("Task scheduled.");
+    });
+  });
+  document.querySelectorAll("[data-resize-task]").forEach((node) => node.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const taskId = node.dataset.resizeTask;
+    const entry = tikTikState().schedule[taskId];
+    if (!entry) return;
+    const block = node.closest(".scheduled-block");
+    tikTikResize = { taskId, startY: event.clientY, baseDuration: entry.duration || TIKTIK_MIN_DURATION, block };
+    node.setPointerCapture(event.pointerId);
+  }));
+  document.querySelectorAll(".scheduled-block").forEach((block) => {
+    block.addEventListener("pointermove", (event) => {
+      if (!tikTikResize || tikTikResize.block !== block) return;
+      const deltaMinutes = ((event.clientY - tikTikResize.startY) / TIKTIK_ROW_HEIGHT) * 60;
+      const snapped = Math.max(TIKTIK_MIN_DURATION, Math.round((tikTikResize.baseDuration + deltaMinutes) / TIKTIK_MIN_DURATION) * TIKTIK_MIN_DURATION);
+      block.style.height = `${(snapped / 60) * TIKTIK_ROW_HEIGHT}px`;
+      tikTikResize.pending = snapped;
+    });
+    block.addEventListener("pointerup", () => {
+      if (!tikTikResize || tikTikResize.block !== block) return;
+      const entry = tikTikState().schedule[tikTikResize.taskId];
+      if (entry && tikTikResize.pending) {
+        const maxDuration = TIKTIK_DAY_END - entry.start;
+        entry.duration = Math.min(tikTikResize.pending, maxDuration);
+      }
+      tikTikResize = null;
+      persistTikTik();
+      render();
     });
   });
 }
