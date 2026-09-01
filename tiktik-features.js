@@ -140,7 +140,7 @@ function renderTikTikSchedule() {
   const todayFolderName = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}`;
   const todayFolder = byProfile(state.folders).find((folder) => folder.name === todayFolderName);
   const tasks = byProfile(state.tasks)
-    .filter((task) => todayFolder ? task.folderId === todayFolder.id : task.date === today())
+    .filter((task) => !todayFolder || task.folderId === todayFolder.id)
     .sort(compareTasks);
   const schedule = tikTikState().schedule;
   const currentMinute = now.getHours() * 60 + now.getMinutes();
