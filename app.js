@@ -1226,9 +1226,7 @@ function renderCalendar() {
     ` : ""}
     <div class="calendar-legend">
       ${periodTrackingSourceProfile() ? `
-        <span><i class="legend-dot period"></i> Period</span>
-        <span><i class="legend-dot ovulation"></i> Ovulation</span>
-        <span><i class="legend-dot predicted-period"></i> Predicted period</span>
+        <span><i class="legend-dot period"></i> Period/Ovulation</span>
       ` : ""}
       <span><i class="legend-dot event"></i> Event</span>
       <span>🌕 Full moon · 🌑 New moon${moonPhasesEnabled ? " · other phases shown daily (this device only)" : ""}</span>
