@@ -136,9 +136,13 @@ function renderTikTikSchedule() {
   if (!profile) return "";
   ensureFreshSchedule();
   pruneOrphanedTikTikEntries();
-  const tasks = byProfile(state.tasks).filter((task) => task.date === today()).sort(compareTasks);
-  const schedule = tikTikState().schedule;
   const now = new Date();
+  const todayFolderName = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const todayFolder = byProfile(state.folders).find((folder) => folder.name === todayFolderName);
+  const tasks = byProfile(state.tasks)
+    .filter((task) => todayFolder ? task.folderId === todayFolder.id : task.date === today())
+    .sort(compareTasks);
+  const schedule = tikTikState().schedule;
   const currentMinute = now.getHours() * 60 + now.getMinutes();
   const hours = Array.from({ length: (TIKTIK_DAY_END - TIKTIK_DAY_START) / 60 + 1 }, (_, index) => TIKTIK_DAY_START + index * 60);
   const scheduled = tasks.filter((task) => schedule[task.id]);
