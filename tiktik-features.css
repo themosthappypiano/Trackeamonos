@@ -12,7 +12,7 @@
 .tiktik-task-list { margin-top:2px; }
 .schedule-workspace { display:grid; grid-template-columns:minmax(150px, .42fr) minmax(0, 1fr); gap:12px; }
 .schedule-task-bank, .tiktik-timeline { border:2px solid var(--line); border-radius:8px; background:var(--panel); }
-.schedule-task-bank { display:grid; align-content:start; gap:8px; padding:12px; }
+.schedule-task-bank { display:grid; align-content:start; gap:8px; padding:12px; position:sticky; top:12px; align-self:start; max-height:calc(100vh - 24px); overflow-y:auto; }
 .schedule-task-bank strong { font-size:13px; }
 .schedule-task-bank > span { color:var(--muted); font-size:12px; font-weight:700; }
 .schedule-task-chip, .scheduled-task { border:2px solid var(--line); border-radius:7px; background:var(--panel-soft); color:var(--ink); padding:8px; font-size:12px; font-weight:800; text-align:left; cursor:grab; }
