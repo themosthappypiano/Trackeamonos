@@ -1457,10 +1457,9 @@ function renderChecklist() {
               <span>${habit.count}/${habit.target} today</span>
               <div class="habit-meter" style="--meter:${pct}%"><div></div></div>
             </div>
-            <div class="counter">
-              <button class="icon-button" data-habit-count="${habit.id}:-1">−</button>
-              <span class="habit-status ${pct >= 100 ? "done" : ""}">${pct >= 100 ? "Yes" : "No"}</span>
-              <button class="icon-button primary" data-habit-count="${habit.id}:1">+</button>
+            <div class="check-row">
+              <button class="${pct >= 100 ? "active yes" : ""}" data-habit-count="${habit.id}:1">Yes</button>
+              <button class="${habit.count === 0 ? "active no" : ""}" data-habit-count="${habit.id}:-1">No</button>
             </div>
           </article>
         `;
