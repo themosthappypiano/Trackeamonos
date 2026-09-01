@@ -133,7 +133,7 @@ function renderTikTikSchedule() {
   if (!profile) return "";
   ensureFreshSchedule();
   pruneOrphanedTikTikEntries();
-  const tasks = byProfile(state.tasks).sort(compareTasks);
+  const tasks = byProfile(state.tasks).filter((task) => task.date === today()).sort(compareTasks);
   const schedule = tikTikState().schedule;
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
