@@ -138,6 +138,7 @@ const seed = {
   gratitude: [],
   periodLogs: [],
   calendarEvents: [],
+  tikTik: { timers: {}, schedule: {}, notes: [], archivedNotes: [], presence: null },
   earnedXp: {}
 };
 
@@ -145,8 +146,16 @@ let state = loadState();
 
 function loadState() {
   const base = cloneState(seed);
-  if (USE_SUPABASE) return base;
   const saved = readStoredState();
+  if (USE_SUPABASE) {
+    if (!saved) return base;
+    try {
+      const parsed = JSON.parse(saved);
+      return { ...base, tikTik: { ...base.tikTik, ...(parsed.tikTik || {}) } };
+    } catch {
+      return base;
+    }
+  }
   if (!saved) return base;
   try {
     const parsed = JSON.parse(saved);
@@ -485,7 +494,7 @@ function uid(prefix) {
 }
 
 function tabLabel(tab) {
-  return { tasks: "Tasks", habits: "Habits", checklist: "Checklist", calendar: "Calendar" }[tab];
+  return { tasks: "Tasks", habits: "Habits", checklist: "Checklist", calendar: "Calendar", timer: "Track", schedule: "Schedule", notes: "Notes" }[tab];
 }
 
 function normalizeChecklist(items) {
@@ -988,7 +997,7 @@ function renderGratitudeRecap() {
 function renderTabs() {
   return `
     <div class="tab-row">
-      ${["tasks", "habits", "checklist", "calendar"].map((tab) => `
+      ${["tasks", "timer", "schedule", "notes", "habits", "checklist", "calendar"].map((tab) => `
         <button class="tab-button ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">
           ${tabLabel(tab)}
         </button>
@@ -998,6 +1007,9 @@ function renderTabs() {
 }
 
 function renderPanel() {
+  if (state.activeTab === "timer") return typeof renderTikTikTimer === "function" ? renderTikTikTimer() : "";
+  if (state.activeTab === "schedule") return typeof renderTikTikSchedule === "function" ? renderTikTikSchedule() : "";
+  if (state.activeTab === "notes") return typeof renderTikTikNotes === "function" ? renderTikTikNotes() : "";
   if (state.activeTab === "habits") return renderHabits();
   if (state.activeTab === "checklist") return renderChecklist();
   if (state.activeTab === "calendar") return renderCalendar();
@@ -1298,7 +1310,7 @@ function renderTasks() {
     return `
       <div class="section-head">
         <div>
-          <button class="pill-button" data-action="close-folder">← Folders</button>
+          <button class="pill-button" data-action="close-folder">← Projects</button>
           <h3>${escapeHtml(openFolder.name)}</h3>
         </div>
         <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
@@ -1325,7 +1337,7 @@ function renderTasks() {
       </div>
       <div class="counter">
         <button class="pill-button primary" data-action="toggle-task-form">+ Add task</button>
-        <button class="pill-button primary" data-action="toggle-folder-form">+ Add folder</button>
+        <button class="pill-button primary" data-action="toggle-folder-form">+ Add project</button>
       </div>
     </div>
     ${state.taskFormOpen ? `
@@ -1742,6 +1754,8 @@ function bindEvents() {
       deleteCalendarEvent(node.dataset.deleteEventId);
     });
   });
+
+  if (typeof bindTikTikEvents === "function") bindTikTikEvents();
 }
 
 function handleAction(action) {

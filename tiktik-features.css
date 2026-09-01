@@ -1,0 +1,33 @@
+
+/* Tik Tik workspace additions: kept within the existing Traquea Monos visual system. */
+.tab-row { flex-wrap:wrap; }
+.tab-row .tab-button { flex:1 1 82px; }
+.tiktik-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.tiktik-summary-grid article { display:grid; gap:4px; padding:13px; border:2px solid var(--line); border-radius:8px; background:var(--panel-soft); }
+.tiktik-summary-grid strong { font-size:23px; line-height:1; }
+.tiktik-summary-grid span, .timer-now span, .archive-count { color:var(--muted); font-size:12px; font-weight:750; }
+.timer-now { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px; border:2px solid var(--line); border-radius:8px; background:var(--panel); }
+.timer-now.running { border-color:var(--blue); background:linear-gradient(90deg, rgba(35,111,226,.12), transparent 62%), var(--panel); }
+.timer-now strong { display:block; font-size:16px; }
+.tiktik-task-list { margin-top:2px; }
+.schedule-workspace { display:grid; grid-template-columns:minmax(150px, .42fr) minmax(0, 1fr); gap:12px; }
+.schedule-task-bank, .tiktik-timeline { border:2px solid var(--line); border-radius:8px; background:var(--panel); }
+.schedule-task-bank { display:grid; align-content:start; gap:8px; padding:12px; }
+.schedule-task-bank strong { font-size:13px; }
+.schedule-task-bank > span { color:var(--muted); font-size:12px; font-weight:700; }
+.schedule-task-chip, .scheduled-task { border:2px solid var(--line); border-radius:7px; background:var(--panel-soft); color:var(--ink); padding:8px; font-size:12px; font-weight:800; text-align:left; cursor:grab; }
+.tiktik-timeline { overflow:hidden; }
+.schedule-hour { display:grid; grid-template-columns:58px minmax(0,1fr); min-height:54px; border-bottom:1px solid var(--line); }
+.schedule-hour:last-child { border-bottom:0; }
+.schedule-hour time { padding:12px 8px; color:var(--muted); font-size:11px; font-weight:800; }
+.schedule-hour > div { position:relative; display:flex; align-items:center; gap:6px; padding:7px; border-left:1px solid var(--line); }
+.schedule-now { position:absolute; z-index:2; left:0; right:0; border-top:2px dashed var(--red); color:var(--red); font-size:9px; font-style:normal; font-weight:900; transform:translateY(-50%); pointer-events:none; }
+.scheduled-task { width:100%; border-color:var(--blue); background:rgba(35,111,226,.12); }
+.scheduled-task small { float:right; color:var(--muted); font-size:10px; }
+.daily-notes-card { display:grid; gap:8px; }
+.daily-note { display:grid; grid-template-columns:22px minmax(0,1fr) 34px; align-items:center; gap:8px; padding:12px; border:2px solid var(--line); border-radius:8px; background:var(--panel); font-weight:750; }
+.daily-note input { width:17px; height:17px; accent-color:var(--green); }
+.daily-note.done span { color:var(--muted); text-decoration:line-through; }
+.daily-note button { border:0; background:transparent; color:var(--muted); font-size:19px; }
+.archive-count { margin:0; text-align:right; }
+@media (max-width:620px) { .tiktik-summary-grid, .schedule-workspace { grid-template-columns:1fr; } .timer-now { align-items:flex-start; flex-direction:column; } }
