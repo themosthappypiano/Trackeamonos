@@ -1671,6 +1671,13 @@ async function boot() {
 }
 
 boot();
+scheduleMidnightRefresh();
+
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  window.setTimeout(() => window.location.reload(), nextMidnight.getTime() - now.getTime());
+}
 
 
 function renderGuideModal() {
