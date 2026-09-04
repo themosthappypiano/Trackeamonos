@@ -1595,11 +1595,6 @@ function renderOverview(profile) {
         <div class="progress-line" style="--progress-width:${taskPct}%"><div></div></div>
       </div>
       <div class="overview-card compact">
-        <strong>Habit score</strong>
-        <b>${profileStats.habitScore}%</b>
-        <div class="progress-line" style="--progress-width:${profileStats.habitScore}%"><div></div></div>
-      </div>
-      <div class="overview-card compact">
         <strong>Checklist answered</strong>
         <b>${profileStats.answered}/${profileStats.checklist}</b>
         <div class="progress-line" style="--progress-width:${checkPct}%"><div></div></div>
@@ -2851,6 +2846,13 @@ async function boot() {
 }
 
 boot();
+scheduleMidnightRefresh();
+
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  window.setTimeout(() => window.location.reload(), nextMidnight.getTime() - now.getTime());
+}
 
 
 let monkeyModeActive = false;
