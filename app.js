@@ -588,13 +588,18 @@ function stats(profileId) {
     : 0;
   const checklist = state.checklist.filter((item) => item.profileId === profileId);
   const clean = checklist.filter((item) => item.answer === false).length;
-  const answered = checklist.filter((item) => item.answer !== null).length;
-  const earnedToday = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5;
+  const checklistAnswered = checklist.filter((item) => item.answer !== null).length;
+  const habitsAnswered = habits.filter((habit) =>
+    (state.habitLogs || []).some((log) => log.habitId === habit.id && log.date === today())
+  ).length;
+  const boxes = checklist.length + habits.length;
+  const answered = checklistAnswered + habitsAnswered;
+  const earnedToday = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + checklistAnswered * 5;
   const xpPenalty = state.profiles.find((p) => p.id === profileId)?.xpPenalty || 0;
   const xp = Math.max(0, (state.earnedXp[profileId] || 0) + earnedToday - xpPenalty);
   const level = Math.floor(xp / 100) + 1;
   const levelProgress = xp % 100;
-  return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: checklist.length, answered, xp, level, levelProgress };
+  return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: boxes, answered, xp, level, levelProgress };
 }
 
 function calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs) {

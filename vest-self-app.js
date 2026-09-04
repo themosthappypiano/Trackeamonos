@@ -35,6 +35,7 @@ const seed = {
   profiles: [],
   tasks: [],
   habits: [],
+  habitLogs: [],
   checklist: [],
   gratitude: [],
   earnedXp: {}
@@ -219,6 +220,16 @@ function mapHabit(row, logs) {
   };
 }
 
+function mapHabitLog(row) {
+  return {
+    id: row.id,
+    habitId: row.habit_id,
+    profileId: row.profile_id,
+    date: row.log_date,
+    count: row.count
+  };
+}
+
 function mapChecklistItem(row, logs) {
   const log = logs.find((item) => item.checklist_item_id === row.id);
   return {
@@ -362,12 +373,17 @@ function stats(profileId) {
     : 0;
   const checklist = state.checklist.filter((item) => item.profileId === profileId);
   const clean = checklist.filter((item) => item.answer === false).length;
-  const answered = checklist.filter((item) => item.answer !== null).length;
-  const earnedToday = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + answered * 5;
+  const checklistAnswered = checklist.filter((item) => item.answer !== null).length;
+  const habitsAnswered = habits.filter((habit) =>
+    (state.habitLogs || []).some((log) => log.habitId === habit.id && log.date === today())
+  ).length;
+  const boxes = checklist.length + habits.length;
+  const answered = checklistAnswered + habitsAnswered;
+  const earnedToday = done * 35 + Math.round(habitScore * 1.5) + clean * 20 + checklistAnswered * 5;
   const xp = (state.earnedXp[profileId] || 0) + earnedToday;
   const level = Math.floor(xp / 100) + 1;
   const levelProgress = xp % 100;
-  return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: checklist.length, answered, xp, level, levelProgress };
+  return { tasks: activeTasks.length + done, done, overdue, habitScore, clean, checklist: boxes, answered, xp, level, levelProgress };
 }
 
 function calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs) {
@@ -467,6 +483,7 @@ async function hydrateFromSupabase() {
       profiles: profiles.map(mapProfile),
       tasks: tasks.map(mapTask),
       habits: habits.map((habit) => mapHabit(habit, habitLogs.filter((log) => log.log_date === today()))),
+      habitLogs: habitLogs.map(mapHabitLog),
       checklist: normalizeChecklist(checklistItems.map((item) => mapChecklistItem(item, checklistLogs.filter((log) => log.log_date === today())))),
       gratitude: gratitude.map(mapGratitude),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
@@ -890,11 +907,6 @@ function renderOverview(profile) {
         <strong>Tasks complete</strong>
         <b>${profileStats.done}/${profileStats.tasks}</b>
         <div class="progress-line" style="--progress-width:${taskPct}%"><div></div></div>
-      </div>
-      <div class="overview-card">
-        <strong>Habit score</strong>
-        <b>${profileStats.habitScore}%</b>
-        <div class="progress-line" style="--progress-width:${profileStats.habitScore}%"><div></div></div>
       </div>
       <div class="overview-card">
         <strong>Checklist answered</strong>
