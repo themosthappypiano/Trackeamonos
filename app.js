@@ -144,6 +144,11 @@ const seed = {
   earnedXp: {}
 };
 
+let deviceOwnerId = null;
+try {
+  deviceOwnerId = localStorage.getItem("traquea-monos-device-owner");
+} catch (e) {}
+
 let state = loadState();
 
 function loadState() {
