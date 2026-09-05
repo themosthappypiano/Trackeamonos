@@ -298,6 +298,21 @@ async function supabaseRequest(table, { method = "GET", query = "", body, prefer
   return responseBody ? JSON.parse(responseBody) : null;
 }
 
+
+function canViewItem(itemProfileId, visibility) {
+  if (visibility !== "private") return true;
+  return deviceOwnerId === itemProfileId;
+}
+function canViewSection(profile, sectionName) {
+  if (!profile.hiddenSections || !profile.hiddenSections.includes(sectionName)) return true;
+  return deviceOwnerId === profile.id;
+}
+function renderVisibilityToggle(item, kind) {
+  if (deviceOwnerId !== item.profileId) return "";
+  const isPrivate = item.visibility === "private";
+  return `<button class="icon-button visibility-toggle" data-toggle-visibility="${kind}:${item.id}" title="${isPrivate ? 'Private' : 'Public'}">${isPrivate ? '🔒' : '👁️'}</button>`;
+}
+
 function mapProfile(row) {
   return {
     id: row.id,
@@ -305,6 +320,7 @@ function mapProfile(row) {
     color: profileColor(row.color),
     avatar: row.avatar || row.display_name?.[0]?.toUpperCase() || "?",
     photo: row.avatar_url || "",
+    hiddenSections: row.hidden_sections || [],
     streak: row.streak_count || 0,
     lastActiveDate: row.last_active_date || null,
     likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
@@ -323,7 +339,8 @@ function mapTask(row) {
     status: row.status,
     sortOrder: row.sort_order == null ? null : Number(row.sort_order),
     folderId: row.folder_id || null,
-    completedAt: row.completed_at || null,
+    completedAt: row.completed_at,
+    visibility: row.visibility || "public" || null,
     createdAt: row.created_at
   };
 }
@@ -346,6 +363,7 @@ function mapHabit(row, logs) {
     profileId: row.profile_id,
     title: row.title,
     target: row.target_count,
+    visibility: row.visibility || "public",
     count: log?.count || 0,
     createdAt: row.created_at
   };
@@ -367,6 +385,7 @@ function mapChecklistItem(row, logs) {
     id: row.id,
     profileId: row.profile_id,
     prompt: row.prompt,
+    visibility: row.visibility || "public",
     answer: log ? log.answer : null,
     createdAt: row.created_at
   };
@@ -387,7 +406,8 @@ function mapGratitude(row) {
     id: row.id,
     profileId: row.profile_id,
     date: row.gratitude_date,
-    text: row.note
+    text: row.note,
+    hiddenFrom: row.hidden_from || []
   };
 }
 
@@ -663,7 +683,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -675,13 +695,13 @@ async function hydrateFromSupabase() {
     }
     const idFilter = `(${profileIds.join(",")})`;
     const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs, calendarEvents] = await Promise.all([
-      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
+      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at,visibility&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("task_folders", { query: `?select=id,profile_id,name,color,sort_order,created_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
-      supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
+      supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at,visibility&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
       supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
-      supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
+      supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at,visibility&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
       supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
-      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note&profile_id=in.${idFilter}&order=gratitude_date.desc` }),
+      supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note,hidden_from&profile_id=in.${idFilter}&order=gratitude_date.desc` }),
       supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` }),
       supabaseRequest("calendar_events", { query: "?select=id,title,event_date,event_type,recurring,created_by&order=event_date.asc" })
     ]);
@@ -974,6 +994,21 @@ function renderSidebarSettings(profile) {
         <input id="profile-name" value="${escapeHtml(profile.name)}" />
       </div>
       <div class="field">
+        <label for="device-owner">This Device Belongs To (Privacy)</label>
+        <select id="device-owner" data-action="set-device-owner">
+          <option value="">Public Device (No Owner)</option>
+          ${state.profiles.map((p) => `<option value="${p.id}" ${p.id === deviceOwnerId ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Hide Sections from Others</label>
+        <div class="checkbox-group">
+          ${["tasks", "habits", "checklist", "gratitude"].map(sec => `
+            <label><input type="checkbox" data-section-hide="${sec}" ${profile.hiddenSections.includes(sec) ? "checked" : ""}> ${sec}</label>
+          `).join("")}
+        </div>
+      </div>
+      <div class="field">
         <label for="profile-photo">Profile picture</label>
         <input id="profile-photo" type="file" accept="image/*,.gif" />
       </div>
@@ -1012,7 +1047,7 @@ function hashString(value) {
 function latestGratitudeByName(name) {
   const owner = findProfileByName(name);
   if (!owner) return null;
-  const entries = (state.gratitude || [])
+  const entries = (state.gratitude || []).filter(g => !g.hiddenFrom || !g.hiddenFrom.includes(deviceOwnerId))
     .filter((item) => item.profileId === owner.id && item.text && item.text.trim())
     .sort((a, b) => b.date.localeCompare(a.date));
   if (!entries.length) return null;
@@ -1333,7 +1368,8 @@ function renderTaskItem(task) {
         ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
         ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ""}
       </div>
-      <div class="task-actions">
+      ${renderVisibilityToggle(task, "tasks")}
+              <div class="task-actions">
         <select class="task-folder-select" data-task-folder="${task.id}" title="Move to folder">
           <option value="">No folder</option>
           ${byProfile(state.folders).sort(compareTasks).map((folder) => `
@@ -1348,7 +1384,8 @@ function renderTaskItem(task) {
 }
 
 function renderTasks() {
-  const tasks = byProfile(state.tasks)
+  if (!canViewSection(activeProfile(), "tasks")) return `<div class="section-head"><h3>Tasks</h3></div><p style="padding:1rem;color:var(--text-muted)">This section is private.</p>`;
+  const tasks = byProfile(state.tasks).filter(t => canViewItem(t.profileId, t.visibility))
     .filter(isTaskVisibleToday)
     .sort(compareTasks);
   const folders = byProfile(state.folders).sort(compareTasks);
@@ -1440,8 +1477,9 @@ function renderTasks() {
 }
 
 function renderChecklist() {
-  const habits = byProfile(state.habits).sort(compareItems);
-  const checks = byProfile(state.checklist).sort(compareItems);
+  if (!canViewSection(activeProfile(), "habits") && !canViewSection(activeProfile(), "checklist")) return `<div class="section-head"><h3>Checklist</h3></div><p style="padding:1rem;color:var(--text-muted)">This section is private.</p>`;
+  const habits = byProfile(state.habits).filter(h => canViewItem(h.profileId, h.visibility)).sort(compareItems);
+  const checks = byProfile(state.checklist).filter(c => canViewItem(c.profileId, c.visibility)).sort(compareItems);
   return `
     <div class="section-head">
       <div>
@@ -1476,6 +1514,7 @@ function renderChecklist() {
               <span>${habit.count}/${habit.target} today</span>
             </div>
             <div class="check-row">
+            ${renderVisibilityToggle(item, "checklist_items")}
               <button class="${pct >= 100 ? "active yes" : ""}" data-habit-set="${habit.id}:yes">Yes</button>
               <button class="${habit.count === 0 ? "active no" : ""}" data-habit-set="${habit.id}:no">No</button>
             </div>
@@ -1489,6 +1528,7 @@ function renderChecklist() {
             <span>${item.answer === null ? "Not logged yet" : item.answer ? "Confirmed" : "Not today"}</span>
           </div>
           <div class="check-row">
+            ${renderVisibilityToggle(item, "checklist_items")}
             <button class="${item.answer === true ? "active yes" : ""}" data-check="${item.id}:true">Yes</button>
             <button class="${item.answer === false ? "active no" : ""}" data-check="${item.id}:false">No</button>
           </div>
@@ -1514,6 +1554,27 @@ function renderGratitudeModal() {
         <label for="gratitude-text">I am grateful for</label>
         <textarea id="gratitude-text" placeholder="Something small, real, or good from today">${escapeHtml(gratitude.text)}</textarea>
         <button class="pill-button primary" data-action="save-gratitude">Save gratitude</button>
+
+        <div class="past-gratitudes" style="margin-top: 2rem;">
+          <h4>Past Gratitudes</h4>
+          ${state.gratitude.filter(g => g.profileId === activeProfile().id).sort((a, b) => b.date.localeCompare(a.date)).map(g => `
+            <div class="gratitude-entry" style="background:var(--surface-hover); padding:1rem; border-radius:8px; margin-bottom:1rem;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+                <span class="gratitude-recap-name"><i>${formatDateLabel(g.date)}</i></span>
+              </div>
+              <p>${escapeHtml(g.text)}</p>
+              <div style="margin-top:0.5rem; font-size:0.85rem; color:var(--text-muted);">
+                Hide from:
+                ${state.profiles.filter(p => p.id !== activeProfile().id).map(p => `
+                  <label style="margin-left:0.5rem;">
+                    <input type="checkbox" data-hide-gratitude="${g.id}:${p.id}" ${g.hiddenFrom && g.hiddenFrom.includes(p.id) ? "checked" : ""}> ${escapeHtml(p.name)}
+                  </label>
+                `).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+
       </section>
     </div>
   `;
@@ -1622,6 +1683,94 @@ function renderOverview(profile) {
 }
 
 function bindEvents() {
+
+  const deviceOwnerSelect = document.querySelector("#device-owner");
+  if (deviceOwnerSelect) {
+    deviceOwnerSelect.addEventListener("change", (e) => {
+      deviceOwnerId = e.target.value;
+      if (deviceOwnerId) {
+        localStorage.setItem("traquea-monos-device-owner", deviceOwnerId);
+      } else {
+        localStorage.removeItem("traquea-monos-device-owner");
+      }
+      render();
+    });
+  }
+
+  document.querySelectorAll("[data-section-hide]").forEach(node => {
+    node.addEventListener("change", async (e) => {
+      const section = node.dataset.sectionHide;
+      const isChecked = e.target.checked;
+      const profile = activeProfile();
+      let hiddenSections = profile.hiddenSections || [];
+      if (isChecked && !hiddenSections.includes(section)) {
+        hiddenSections.push(section);
+      } else if (!isChecked && hiddenSections.includes(section)) {
+        hiddenSections = hiddenSections.filter(s => s !== section);
+      }
+      profile.hiddenSections = hiddenSections;
+      
+      try {
+        await supabaseRequest(`profiles?id=eq.${profile.id}`, {
+          method: "PATCH",
+          body: { hidden_sections: hiddenSections }
+        });
+      } catch (err) {
+        notify("Failed to save section privacy.");
+      }
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-toggle-visibility]").forEach(node => {
+    node.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const [kind, id] = node.dataset.toggleVisibility.split(":");
+      const collectionName = kind === "checklist_items" ? "checklist" : kind;
+      const item = state[collectionName].find(i => i.id === id);
+      if (!item) return;
+      
+      const newVisibility = item.visibility === "private" ? "public" : "private";
+      item.visibility = newVisibility;
+      render(); // Optimistic update
+      
+      try {
+        await supabaseRequest(`${kind}?id=eq.${id}`, {
+          method: "PATCH",
+          body: { visibility: newVisibility }
+        });
+      } catch (err) {
+        notify("Failed to save visibility.");
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-hide-gratitude]").forEach(node => {
+    node.addEventListener("change", async (e) => {
+      const [gratitudeId, targetProfileId] = node.dataset.hideGratitude.split(":");
+      const isChecked = e.target.checked;
+      const entry = state.gratitude.find(g => g.id === gratitudeId);
+      if (!entry) return;
+      
+      let hiddenFrom = entry.hiddenFrom || [];
+      if (isChecked && !hiddenFrom.includes(targetProfileId)) {
+        hiddenFrom.push(targetProfileId);
+      } else if (!isChecked && hiddenFrom.includes(targetProfileId)) {
+        hiddenFrom = hiddenFrom.filter(id => id !== targetProfileId);
+      }
+      entry.hiddenFrom = hiddenFrom;
+      
+      try {
+        await supabaseRequest(`daily_gratitude?id=eq.${gratitudeId}`, {
+          method: "PATCH",
+          body: { hidden_from: hiddenFrom }
+        });
+      } catch (err) {
+        notify("Failed to save gratitude privacy.");
+      }
+    });
+  });
+
   document.querySelectorAll("[data-action]").forEach((node) => {
     node.addEventListener("click", (event) => {
       if (event.target.closest("[data-modal]") && node.classList.contains("modal-backdrop")) return;
