@@ -2431,7 +2431,8 @@ async function deleteProfile(id) {
 
 function startDrag(event) {
   if (taskReorderInFlight && event.currentTarget.dataset.dragKind === "tasks") return;
-  if (event.target.closest("button, input, textarea, label, select")) return;
+  if (event.target.closest("button, input, textarea, label")) return;
+  if (event.pointerType === "touch") return; // Disable drag-to-reorder on touch devices to allow scrolling
   const node = event.currentTarget;
   const kind = node.dataset.dragKind;
   const scope = node.dataset.dragScope || "";
