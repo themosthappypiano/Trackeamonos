@@ -304,13 +304,15 @@ function canViewItem(itemProfileId, visibility) {
   return deviceOwnerId === itemProfileId;
 }
 function canViewSection(profile, sectionName) {
+  if (!profile) return true;
   if (!profile.hiddenSections || !profile.hiddenSections.includes(sectionName)) return true;
   return deviceOwnerId === profile.id;
 }
 function renderVisibilityToggle(item, kind) {
+  if (!item) return "";
   if (deviceOwnerId !== item.profileId) return "";
   const isPrivate = item.visibility === "private";
-  return `<button class="icon-button visibility-toggle" data-toggle-visibility="${kind}:${item.id}" title="${isPrivate ? 'Private' : 'Public'}">${isPrivate ? '🔒' : '👁️'}</button>`;
+  return `<button class="icon-button visibility-toggle" style="background: transparent; border: none; font-size: 1.1rem; padding: 2px 6px; cursor: pointer;" data-toggle-visibility="${kind}:${item.id}" title="${isPrivate ? 'Private' : 'Public'}">${isPrivate ? '🔒' : '👁️'}</button>`;
 }
 
 function mapProfile(row) {
