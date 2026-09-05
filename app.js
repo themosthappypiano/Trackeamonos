@@ -2429,11 +2429,51 @@ async function deleteProfile(id) {
   }
 }
 
+let holdTimeout = null;
+let holdState = null;
+
+function clearHold() {
+  if (holdTimeout) clearTimeout(holdTimeout);
+  holdTimeout = null;
+  if (holdState) {
+    const { node } = holdState;
+    node.removeEventListener("pointermove", checkHoldMove);
+    node.removeEventListener("pointerup", clearHold);
+    node.removeEventListener("pointercancel", clearHold);
+    holdState = null;
+  }
+}
+
+function checkHoldMove(event) {
+  if (!holdState) return;
+  if (Math.abs(event.clientY - holdState.y) > 10 || Math.abs(event.clientX - holdState.x) > 10) {
+    clearHold(); // user is scrolling
+  }
+}
+
 function startDrag(event) {
   if (taskReorderInFlight && event.currentTarget.dataset.dragKind === "tasks") return;
   if (event.target.closest("button, input, textarea, label")) return;
-  if (event.pointerType === "touch") return; // Disable drag-to-reorder on touch devices to allow scrolling
+  
   const node = event.currentTarget;
+  if (event.pointerType === "touch") {
+    holdState = { x: event.clientX, y: event.clientY, node, event };
+    node.addEventListener("pointermove", checkHoldMove);
+    node.addEventListener("pointerup", clearHold);
+    node.addEventListener("pointercancel", clearHold);
+    holdTimeout = setTimeout(() => {
+      const savedEvent = holdState ? holdState.event : event;
+      clearHold();
+      if (navigator.vibrate) navigator.vibrate(50); // Haptic feedback for touch hold
+      node.style.touchAction = "none"; // Prevent browser pan during drag
+      executeDrag(savedEvent, node);
+    }, 450); // 450ms hold
+  } else {
+    executeDrag(event, node);
+  }
+}
+
+function executeDrag(event, node) {
   const kind = node.dataset.dragKind;
   const scope = node.dataset.dragScope || "";
   const siblings = Array.from(document.querySelectorAll(
@@ -2469,6 +2509,7 @@ function endDrag(event) {
   const node = event.currentTarget;
   node.classList.remove("dragging");
   node.style.transform = "";
+  node.style.touchAction = "";
   node.removeEventListener("pointermove", dragMove);
   node.removeEventListener("pointerup", endDrag);
   node.removeEventListener("pointercancel", endDrag);
