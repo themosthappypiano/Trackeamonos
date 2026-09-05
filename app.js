@@ -1011,7 +1011,7 @@ function renderSidebarSettings(profile) {
         <label>Hide Sections from Others</label>
         <div class="checkbox-group">
           ${["tasks", "habits", "checklist", "gratitude"].map(sec => `
-            <label><input type="checkbox" data-section-hide="${sec}" ${profile.hiddenSections.includes(sec) ? "checked" : ""}> ${sec}</label>
+            <label><input type="checkbox" data-section-hide="${sec}" ${(profile.hiddenSections || []).includes(sec) ? "checked" : ""}> ${sec}</label>
           `).join("")}
         </div>
       </div>
