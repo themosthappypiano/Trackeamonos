@@ -177,6 +177,8 @@ if (supabaseClient) {
   state.loading = false;
 }
 
+let authMode = "login"; // "login" | "signup"
+
 async function handleLogin() {
   const email = document.getElementById("auth-email").value;
   const password = document.getElementById("auth-password").value;
@@ -188,10 +190,18 @@ async function handleLogin() {
 async function handleSignup() {
   const email = document.getElementById("auth-email").value;
   const password = document.getElementById("auth-password").value;
+  const confirmPassword = document.getElementById("auth-confirm-password")?.value;
   if (!email || !password) { notify("Enter email and password."); return; }
+  if (password !== confirmPassword) { notify("Passwords do not match."); return; }
+  if (password.length < 6) { notify("Password must be at least 6 characters."); return; }
   const { error } = await supabaseClient.auth.signUp({ email, password });
   if (error) notify(error.message);
   else notify("Check your email for the confirmation link!");
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  renderAuth();
 }
 
 async function handleLogout() {
@@ -205,21 +215,27 @@ async function handleLogout() {
 
 function renderAuth() {
   const app = document.getElementById("app");
+  const isSignup = authMode === "signup";
   app.innerHTML = `
     <div class="intro-screen">
       <div class="intro-content">
         <h1>Trackeamonos</h1>
-        <p>Sign in to your private workspace</p>
+        <p>${isSignup ? "Create your private account" : "Sign in to your private workspace"}</p>
         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
           <input type="email" id="auth-email" placeholder="Email" class="form-input" />
           <input type="password" id="auth-password" placeholder="Password" class="form-input" />
-          <button class="pill-button primary" onclick="handleLogin()">Log In</button>
-          <button class="pill-button secondary" onclick="handleSignup()">Sign Up</button>
+          ${isSignup ? `<input type="password" id="auth-confirm-password" placeholder="Confirm password" class="form-input" />` : ""}
+          ${isSignup
+            ? `<button class="pill-button primary" onclick="handleSignup()">Sign Up</button>
+               <button class="pill-button secondary" onclick="setAuthMode('login')">Back to Log In</button>`
+            : `<button class="pill-button primary" onclick="handleLogin()">Log In</button>
+               <button class="pill-button secondary" onclick="setAuthMode('signup')">Sign Up</button>`}
         </div>
       </div>
     </div>
   `;
 }
+
 
 
 let state = loadState();
@@ -393,6 +409,29 @@ function renderVisibilityToggle(item, kind) {
   return `<button class="icon-button visibility-toggle" style="background: transparent; border: none; font-size: 1.1rem; padding: 2px 6px; cursor: pointer;" data-toggle-visibility="${kind}:${item.id}" title="${isPrivate ? 'Private' : 'Public'}">${isPrivate ? '🔒' : '👁️'}</button>`;
 }
 
+// Small "hide this specific item from person X" control, same idea as gratitude's
+// hidden_from but reusable for tasks / habits / checklist_items.
+function renderHideFromControl(item, table) {
+  if (!item) return "";
+  if (!activeProfile() || item.profileId !== activeProfile().id) return "";
+  const others = state.profiles.filter(p => p.id !== item.profileId);
+  if (!others.length) return "";
+  const hiddenFrom = item.hiddenFrom || [];
+  return `
+    <span class="hide-from-control" style="position:relative; display:inline-block;">
+      <button type="button" class="icon-button" data-hide-from-toggle="${table}:${item.id}" title="Hide from specific people" style="background: transparent; border: none; font-size: 1rem; padding: 2px 4px; cursor: pointer;">🙈</button>
+      <span class="hide-from-menu" data-hide-from-menu="${table}:${item.id}" style="display:none; position:absolute; right:0; top:100%; background:var(--surface,#fff); border:1px solid var(--border,#ddd); border-radius:8px; padding:6px 10px; z-index:20; white-space:nowrap;">
+        ${others.map(p => `
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; padding:2px 0;">
+            <input type="checkbox" data-hide-item="${table}:${item.id}:${p.id}" ${hiddenFrom.includes(p.id) ? "checked" : ""}>
+            ${escapeHtml(p.name)}
+          </label>
+        `).join("")}
+      </span>
+    </span>
+  `;
+}
+
 function mapProfile(row) {
   return {
     id: row.id,
@@ -406,7 +445,8 @@ function mapProfile(row) {
     lastActiveDate: row.last_active_date || null,
     likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
     complainJarAmount: row.complain_jar_amount != null ? Number(row.complain_jar_amount) : 0,
-    xpPenalty: row.xp_penalty != null ? Number(row.xp_penalty) : 0
+    xpPenalty: row.xp_penalty != null ? Number(row.xp_penalty) : 0,
+    authUserId: row.auth_user_id || null
   };
 }
 
@@ -422,6 +462,7 @@ function mapTask(row) {
     folderId: row.folder_id || null,
     completedAt: row.completed_at,
     visibility: row.visibility || "public" || null,
+    hiddenFrom: row.hidden_from || [],
     createdAt: row.created_at
   };
 }
@@ -445,6 +486,7 @@ function mapHabit(row, logs) {
     title: row.title,
     target: row.target_count,
     visibility: row.visibility || "public",
+    hiddenFrom: row.hidden_from || [],
     count: log?.count || 0,
     createdAt: row.created_at
   };
@@ -467,6 +509,7 @@ function mapChecklistItem(row, logs) {
     profileId: row.profile_id,
     prompt: row.prompt,
     visibility: row.visibility || "public",
+    hiddenFrom: row.hidden_from || [],
     answer: log ? log.answer : null,
     createdAt: row.created_at
   };
@@ -764,7 +807,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections,shared_with&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections,shared_with,auth_user_id&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -776,11 +819,11 @@ async function hydrateFromSupabase() {
     }
     const idFilter = `(${profileIds.join(",")})`;
     const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs, calendarEvents] = await Promise.all([
-      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at,visibility&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
+      supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at,visibility,hidden_from&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("task_folders", { query: `?select=id,profile_id,name,color,sort_order,created_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
-      supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at,visibility&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
+      supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at,visibility,hidden_from&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
       supabaseRequest("habit_logs", { query: `?select=id,habit_id,profile_id,log_date,count&profile_id=in.${idFilter}` }),
-      supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at,visibility&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
+      supabaseRequest("checklist_items", { query: `?select=id,profile_id,prompt,created_at,visibility,hidden_from&profile_id=in.${idFilter}&active=eq.true&order=created_at.asc` }),
       supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
       supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note,hidden_from&profile_id=in.${idFilter}&order=gratitude_date.desc` }),
       supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` }),
@@ -820,7 +863,12 @@ async function hydrateFromSupabase() {
       calendarEvents: calendarEvents.map(mapCalendarEvent),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
       loading: false,
-      activeProfileId: profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0],
+      activeProfileId: (() => {
+        const mapped = profiles.map(mapProfile);
+        const mine = currentSession && mapped.find(p => p.authUserId === currentSession.user.id);
+        if (mine) return mine.id;
+        return profileIds.includes(state.activeProfileId) ? state.activeProfileId : profileIds[0];
+      })(),
       ...uiState
     };
     const changed = JSON.stringify({
@@ -1459,6 +1507,7 @@ function renderTaskItem(task) {
         ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ""}
       </div>
       ${renderVisibilityToggle(task, "tasks")}
+      ${renderHideFromControl(task, "tasks")}
               <div class="task-actions">
         <select class="task-folder-select" data-task-folder="${task.id}" title="Move to folder">
           <option value="">No folder</option>
@@ -1604,7 +1653,8 @@ function renderChecklist() {
               <span>${habit.count}/${habit.target} today</span>
             </div>
             <div class="check-row">
-            ${renderVisibilityToggle(item, "checklist_items")}
+            ${renderVisibilityToggle(habit, "habits")}
+            ${renderHideFromControl(habit, "habits")}
               <button class="${pct >= 100 ? "active yes" : ""}" data-habit-set="${habit.id}:yes">Yes</button>
               <button class="${habit.count === 0 ? "active no" : ""}" data-habit-set="${habit.id}:no">No</button>
             </div>
@@ -1619,6 +1669,7 @@ function renderChecklist() {
           </div>
           <div class="check-row">
             ${renderVisibilityToggle(item, "checklist_items")}
+            ${renderHideFromControl(item, "checklist_items")}
             <button class="${item.answer === true ? "active yes" : ""}" data-check="${item.id}:true">Yes</button>
             <button class="${item.answer === false ? "active no" : ""}" data-check="${item.id}:false">No</button>
           </div>
@@ -1834,6 +1885,49 @@ function bindEvents() {
       }
     });
   });
+
+  document.querySelectorAll("[data-hide-from-toggle]").forEach(node => {
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const key = node.dataset.hideFromToggle;
+      document.querySelectorAll("[data-hide-from-menu]").forEach(menu => {
+        menu.style.display = menu.dataset.hideFromMenu === key ? (menu.style.display === "none" ? "block" : "none") : "none";
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-hide-item]").forEach(node => {
+    node.addEventListener("change", async (e) => {
+      e.stopPropagation();
+      const [table, itemId, targetProfileId] = node.dataset.hideItem.split(":");
+      const collectionName = table === "checklist_items" ? "checklist" : table;
+      const item = state[collectionName].find(i => i.id === itemId);
+      if (!item) return;
+      const isChecked = e.target.checked;
+      let hiddenFrom = item.hiddenFrom || [];
+      if (isChecked && !hiddenFrom.includes(targetProfileId)) {
+        hiddenFrom = [...hiddenFrom, targetProfileId];
+      } else if (!isChecked) {
+        hiddenFrom = hiddenFrom.filter(id => id !== targetProfileId);
+      }
+      item.hiddenFrom = hiddenFrom;
+      try {
+        await supabaseRequest(`${table}?id=eq.${itemId}`, {
+          method: "PATCH",
+          body: { hidden_from: hiddenFrom }
+        });
+      } catch (err) {
+        notify("Failed to save privacy.");
+      }
+    });
+  });
+
+  if (!window.__hideFromCloseBound) {
+    window.__hideFromCloseBound = true;
+    document.addEventListener("click", () => {
+      document.querySelectorAll("[data-hide-from-menu]").forEach(menu => { menu.style.display = "none"; });
+    });
+  }
 
   document.querySelectorAll("[data-hide-gratitude]").forEach(node => {
     node.addEventListener("change", async (e) => {
