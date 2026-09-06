@@ -151,6 +151,76 @@ let deviceOwnerId = null; // Will map to auth.uid() or linked profile id
 // Initialize Supabase SDK Client
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
+if (supabaseClient) {
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    currentSession = session;
+    currentSessionToken = session ? session.access_token : null;
+    if (session) {
+      hydrateFromSupabase().finally(() => { state.loading = false; render(); });
+    } else {
+      state.loading = false;
+      render();
+    }
+  });
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    currentSession = session;
+    currentSessionToken = session ? session.access_token : null;
+    if (session && state.profiles.length === 0) {
+      hydrateFromSupabase().finally(() => { state.loading = false; render(); });
+    } else {
+      state.loading = false;
+      render();
+    }
+  });
+} else if (USE_SUPABASE) {
+  state.loading = false;
+}
+
+async function handleLogin() {
+  const email = document.getElementById("auth-email").value;
+  const password = document.getElementById("auth-password").value;
+  if (!email || !password) { notify("Enter email and password."); return; }
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) notify(error.message);
+}
+
+async function handleSignup() {
+  const email = document.getElementById("auth-email").value;
+  const password = document.getElementById("auth-password").value;
+  if (!email || !password) { notify("Enter email and password."); return; }
+  const { error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) notify(error.message);
+  else notify("Check your email for the confirmation link!");
+}
+
+async function handleLogout() {
+  await supabaseClient.auth.signOut();
+  state.profiles = [];
+  state.tasks = [];
+  currentSession = null;
+  currentSessionToken = null;
+  window.location.reload();
+}
+
+function renderAuth() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="intro-screen">
+      <div class="intro-content">
+        <h1>Trackeamonos</h1>
+        <p>Sign in to your private workspace</p>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+          <input type="email" id="auth-email" placeholder="Email" class="form-input" />
+          <input type="password" id="auth-password" placeholder="Password" class="form-input" />
+          <button class="pill-button primary" onclick="handleLogin()">Log In</button>
+          <button class="pill-button secondary" onclick="handleSignup()">Sign Up</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 
 let state = loadState();
 
