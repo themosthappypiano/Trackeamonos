@@ -144,10 +144,13 @@ const seed = {
   earnedXp: {}
 };
 
-let deviceOwnerId = null;
-try {
-  deviceOwnerId = localStorage.getItem("traquea-monos-device-owner");
-} catch (e) {}
+let currentSession = null;
+let currentSessionToken = null;
+let deviceOwnerId = null; // Will map to auth.uid() or linked profile id
+
+// Initialize Supabase SDK Client
+const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
 
 let state = loadState();
 
@@ -286,7 +289,7 @@ async function supabaseRequest(table, { method = "GET", query = "", body, prefer
     method,
     headers: {
       apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Authorization: `Bearer ${currentSessionToken || SUPABASE_ANON_KEY}`,
       "Content-Type": "application/json",
       Prefer: prefer
     },
@@ -328,6 +331,7 @@ function mapProfile(row) {
     avatar: row.avatar || row.display_name?.[0]?.toUpperCase() || "?",
     photo: row.avatar_url || "",
     hiddenSections: row.hidden_sections || [],
+    sharedWith: row.shared_with || [],
     streak: row.streak_count || 0,
     lastActiveDate: row.last_active_date || null,
     likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
@@ -690,7 +694,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections,shared_with&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -826,6 +830,10 @@ function maybeBumpStreak(profile) {
 function render() {
   if (state.loading) {
     renderLoadingApp();
+    return;
+  }
+  if (USE_SUPABASE && !currentSession) {
+    renderAuth();
     return;
   }
   if (!introDismissed) {
@@ -1001,12 +1009,17 @@ function renderSidebarSettings(profile) {
         <input id="profile-name" value="${escapeHtml(profile.name)}" />
       </div>
       <div class="field">
-        <label for="device-owner">This Device Belongs To (Privacy)</label>
-        <select id="device-owner" data-action="set-device-owner">
-          <option value="">Public Device (No Owner)</option>
-          ${state.profiles.map((p) => `<option value="${p.id}" ${p.id === deviceOwnerId ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")}
-        </select>
+        <label>Share My Data With</label>
+        <div class="checkbox-group">
+          ${state.profiles.filter(p => p.id !== profile.id).map(p => `
+            <label>
+              <input type="checkbox" data-share-with="${p.id}" ${(profile.sharedWith || []).includes(p.id) ? "checked" : ""}>
+              ${escapeHtml(p.name)}
+            </label>
+          `).join("")}
+        </div>
       </div>
+      <button class="pill-button secondary" onclick="handleLogout()" style="margin-top: 15px; width: 100%;">Log Out</button>
       <div class="field">
         <label>Hide Sections from Others</label>
         <div class="checkbox-group">
@@ -3040,7 +3053,7 @@ async function boot() {
     brandGifSrc = randomGifSrc();
     loadingGifSrc = randomGifSrc();
     render();
-    await hydrateFromSupabase();
+    if (!USE_SUPABASE) await hydrateFromSupabase();
   } catch (error) {
     console.error(error);
     state = { ...state, loading: false };
