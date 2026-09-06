@@ -141,12 +141,14 @@ const seed = {
   periodLogs: [],
   calendarEvents: [],
   tikTik: { timers: {}, schedule: {}, presence: null },
-  earnedXp: {}
+  earnedXp: {},
+  profileVisibility: [],
+  sectionVisibility: [],
+  adminSettingsOpen: false
 };
 
 let currentSession = null;
 let currentSessionToken = null;
-let deviceOwnerId = null; // Will map to auth.uid() or linked profile id
 
 // Initialize Supabase SDK Client
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -395,42 +397,39 @@ async function supabaseRequest(table, { method = "GET", query = "", body, prefer
 
 function canViewItem(itemProfileId, visibility) {
   if (visibility !== "private") return true;
-  return deviceOwnerId === itemProfileId;
+  const me = myProfile();
+  return !!me && me.id === itemProfileId;
 }
 function canViewSection(profile, sectionName) {
   if (!profile) return true;
-  if (!profile.hiddenSections || !profile.hiddenSections.includes(sectionName)) return true;
-  return deviceOwnerId === profile.id;
+  const me = myProfile();
+  if (isCurrentUserAdmin()) return true;
+  if (me && me.id === profile.id) return true;
+  return canViewSectionClient(me ? me.id : null, profile.id, sectionName);
 }
 function renderVisibilityToggle(item, kind) {
   if (!item) return "";
-  if (deviceOwnerId !== item.profileId) return "";
+  const me = myProfile();
+  if (!me || me.id !== item.profileId) return "";
   const isPrivate = item.visibility === "private";
   return `<button class="icon-button visibility-toggle" style="background: transparent; border: none; font-size: 1.1rem; padding: 2px 6px; cursor: pointer;" data-toggle-visibility="${kind}:${item.id}" title="${isPrivate ? 'Private' : 'Public'}">${isPrivate ? '🔒' : '👁️'}</button>`;
 }
 
 // Small "hide this specific item from person X" control, same idea as gratitude's
 // hidden_from but reusable for tasks / habits / checklist_items.
+// Small "hide this specific item from person X" icon — visual indicator only.
+// The actual interaction is right-click anywhere on the item, which opens the
+// Trackeamonos-styled context menu (see openHideFromMenu / bindContextMenus).
 function renderHideFromControl(item, table) {
   if (!item) return "";
   if (!activeProfile() || item.profileId !== activeProfile().id) return "";
   const others = state.profiles.filter(p => p.id !== item.profileId);
   if (!others.length) return "";
   const hiddenFrom = item.hiddenFrom || [];
-  return `
-    <span class="hide-from-control" style="position:relative; display:inline-block;">
-      <button type="button" class="icon-button" data-hide-from-toggle="${table}:${item.id}" title="Hide from specific people" style="background: transparent; border: none; font-size: 1rem; padding: 2px 4px; cursor: pointer;">🙈</button>
-      <span class="hide-from-menu" data-hide-from-menu="${table}:${item.id}" style="display:none; position:absolute; right:0; top:100%; background:var(--surface,#fff); border:1px solid var(--border,#ddd); border-radius:8px; padding:6px 10px; z-index:20; white-space:nowrap;">
-        ${others.map(p => `
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; padding:2px 0;">
-            <input type="checkbox" data-hide-item="${table}:${item.id}:${p.id}" ${hiddenFrom.includes(p.id) ? "checked" : ""}>
-            ${escapeHtml(p.name)}
-          </label>
-        `).join("")}
-      </span>
-    </span>
-  `;
+  const hasHidden = hiddenFrom.length > 0;
+  return `<span class="icon-button" title="Right-click to hide from specific people" style="background: transparent; border: none; font-size: 1rem; padding: 2px 4px; opacity: ${hasHidden ? 1 : 0.55};">🙈</span>`;
 }
+
 
 function mapProfile(row) {
   return {
@@ -446,7 +445,8 @@ function mapProfile(row) {
     likeJarAmount: row.like_jar_amount != null ? Number(row.like_jar_amount) : 0,
     complainJarAmount: row.complain_jar_amount != null ? Number(row.complain_jar_amount) : 0,
     xpPenalty: row.xp_penalty != null ? Number(row.xp_penalty) : 0,
-    authUserId: row.auth_user_id || null
+    authUserId: row.auth_user_id || null,
+    isAdmin: !!row.is_admin
   };
 }
 
@@ -581,6 +581,216 @@ function isLuabubuProfile(profile) {
 
 function isJonashiProfile(profile) {
   return !!profile && (profile.name || "").trim().toLowerCase() === "jonashi";
+}
+
+function isFamilyProfile(profile) {
+  return isLuabubuProfile(profile) || isJonashiProfile(profile);
+}
+
+// Is the currently logged-in profile an admin? Mirrors the DB's is_admin_profile()
+// used in RLS — this copy is only for UI filtering/rendering, the real
+// enforcement always happens server-side.
+function isCurrentUserAdmin() {
+  const me = state.profiles.find(p => p.authUserId === (currentSession && currentSession.user.id));
+  return !!(me && me.isAdmin);
+}
+
+function myProfile() {
+  return state.profiles.find(p => p.authUserId === (currentSession && currentSession.user.id)) || null;
+}
+
+// Mirrors public.can_view_profile() from the DB, for UI filtering (which
+// profile cards to show). RLS is the real gate; this just keeps the UI honest.
+function canViewProfileClient(viewerId, targetId) {
+  if (!viewerId || !targetId) return true;
+  if (viewerId === targetId) return true;
+  const viewer = state.profiles.find(p => p.id === viewerId);
+  const target = state.profiles.find(p => p.id === targetId);
+  if (viewer && viewer.isAdmin) return true;
+  const explicit = (state.profileVisibility || []).find(v => v.viewerId === viewerId && v.targetId === targetId);
+  if (explicit) return explicit.visible;
+  if (isFamilyProfile(viewer) && isFamilyProfile(target)) return true;
+  return false;
+}
+
+// Mirrors public.can_view_section() from the DB.
+function canViewSectionClient(viewerId, ownerId, section) {
+  if (!viewerId || !ownerId) return true;
+  if (viewerId === ownerId) return true;
+  const viewer = state.profiles.find(p => p.id === viewerId);
+  const owner = state.profiles.find(p => p.id === ownerId);
+  if (viewer && viewer.isAdmin) return true;
+  if (!canViewProfileClient(viewerId, ownerId)) return false;
+  const explicit = (state.sectionVisibility || []).find(v => v.ownerId === ownerId && v.section === section && v.viewerId === viewerId);
+  if (explicit) return explicit.visible;
+  if (isFamilyProfile(owner) && isFamilyProfile(viewer)) return true;
+  return false;
+}
+
+async function setProfileVisibility(viewerId, targetId, visible) {
+  const list = (state.profileVisibility || []).filter(v => !(v.viewerId === viewerId && v.targetId === targetId));
+  state.profileVisibility = [...list, { viewerId, targetId, visible }];
+  render();
+  try {
+    await supabaseRequest("profile_visibility", {
+      method: "POST",
+      query: "?on_conflict=viewer_profile_id,target_profile_id",
+      body: { viewer_profile_id: viewerId, target_profile_id: targetId, visible },
+      prefer: "resolution=merge-duplicates,return=minimal"
+    });
+  } catch (err) {
+    notify("Failed to save profile visibility.");
+  }
+}
+
+async function setSectionVisibility(ownerId, section, viewerId, visible) {
+  const list = (state.sectionVisibility || []).filter(v => !(v.ownerId === ownerId && v.section === section && v.viewerId === viewerId));
+  state.sectionVisibility = [...list, { ownerId, section, viewerId, visible }];
+  render();
+  try {
+    await supabaseRequest("section_visibility", {
+      method: "POST",
+      query: "?on_conflict=owner_profile_id,section,viewer_profile_id",
+      body: { owner_profile_id: ownerId, section, viewer_profile_id: viewerId, visible },
+      prefer: "resolution=merge-duplicates,return=minimal"
+    });
+  } catch (err) {
+    notify("Failed to save section visibility.");
+  }
+}
+
+async function toggleHideFromItem(table, itemId, targetProfileId, isChecked) {
+  const collectionName = table === "checklist_items" ? "checklist" : table;
+  const item = state[collectionName].find(i => i.id === itemId);
+  if (!item) return;
+  let hiddenFrom = item.hiddenFrom || [];
+  if (isChecked && !hiddenFrom.includes(targetProfileId)) {
+    hiddenFrom = [...hiddenFrom, targetProfileId];
+  } else if (!isChecked) {
+    hiddenFrom = hiddenFrom.filter(id => id !== targetProfileId);
+  }
+  item.hiddenFrom = hiddenFrom;
+  render();
+  try {
+    await supabaseRequest(`${table}?id=eq.${itemId}`, {
+      method: "PATCH",
+      body: { hidden_from: hiddenFrom }
+    });
+  } catch (err) {
+    notify("Failed to save privacy.");
+  }
+}
+
+// ---- Trackeamonos-styled context menu, replaces native browser popups ----
+function closeContextMenu() {
+  const existing = document.querySelector(".context-menu");
+  if (existing) existing.remove();
+}
+
+function openContextMenu(x, y, title, rowsHtml) {
+  closeContextMenu();
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+  menu.innerHTML = `
+    ${title ? `<div class="context-menu-title">${escapeHtml(title)}</div>` : ""}
+    ${rowsHtml || `<div class="context-menu-empty">Nothing to show.</div>`}
+  `;
+  document.body.appendChild(menu);
+  const rect = menu.getBoundingClientRect();
+  const left = Math.min(x, window.innerWidth - rect.width - 12);
+  const top = Math.min(y, window.innerHeight - rect.height - 12);
+  menu.style.left = `${Math.max(8, left)}px`;
+  menu.style.top = `${Math.max(8, top)}px`;
+  return menu;
+}
+
+if (!window.__contextMenuGlobalBound) {
+  window.__contextMenuGlobalBound = true;
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".context-menu")) closeContextMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeContextMenu();
+  });
+}
+
+
+// Right-click on a task / habit / checklist item: choose who it's hidden from.
+function openItemHideMenu(x, y, table, itemId) {
+  const collectionName = table === "checklist_items" ? "checklist" : table;
+  const item = state[collectionName].find(i => i.id === itemId);
+  if (!item) return;
+  const others = state.profiles.filter(p => p.id !== item.profileId);
+  const hiddenFrom = item.hiddenFrom || [];
+  const rows = others.length
+    ? others.map(p => `
+        <label>
+          <input type="checkbox" data-ctx-hide-item="${table}:${itemId}:${p.id}" ${hiddenFrom.includes(p.id) ? "checked" : ""}>
+          🙈 Hide from ${escapeHtml(p.name)}
+        </label>
+      `).join("")
+    : "";
+  const menu = openContextMenu(x, y, "Hide this item from...", rows);
+  menu.querySelectorAll("[data-ctx-hide-item]").forEach(node => {
+    node.addEventListener("change", (e) => {
+      const [t, id, targetId] = node.dataset.ctxHideItem.split(":");
+      toggleHideFromItem(t, id, targetId, e.target.checked);
+    });
+  });
+}
+
+// Right-click on a profile card: (admin only) choose who can see this profile.
+function openProfileVisibilityMenu(x, y, targetProfileId) {
+  if (!isCurrentUserAdmin()) return;
+  const target = state.profiles.find(p => p.id === targetProfileId);
+  if (!target) return;
+  const viewers = state.profiles.filter(p => p.id !== targetProfileId);
+  const rows = viewers.length
+    ? viewers.map(viewer => {
+        const visible = canViewProfileClient(viewer.id, targetProfileId);
+        return `
+          <label>
+            <input type="checkbox" data-ctx-profile-vis="${viewer.id}:${targetProfileId}" ${visible ? "checked" : ""}>
+            👁️ ${escapeHtml(viewer.name)} can see ${escapeHtml(target.name)}
+          </label>
+        `;
+      }).join("")
+    : "";
+  const menu = openContextMenu(x, y, `Who can see ${target.name}?`, rows);
+  menu.querySelectorAll("[data-ctx-profile-vis]").forEach(node => {
+    node.addEventListener("change", (e) => {
+      const [viewerId, tId] = node.dataset.ctxProfileVis.split(":");
+      setProfileVisibility(viewerId, tId, e.target.checked);
+    });
+  });
+}
+
+// Right-click on a section header: control who sees that section (mine if I own
+// it, or — if I'm admin — anyone's).
+function openSectionVisibilityMenu(x, y, ownerId, section) {
+  const owner = state.profiles.find(p => p.id === ownerId);
+  if (!owner) return;
+  const isMine = myProfile() && myProfile().id === ownerId;
+  if (!isMine && !isCurrentUserAdmin()) return;
+  const viewers = state.profiles.filter(p => p.id !== ownerId);
+  const rows = viewers.length
+    ? viewers.map(viewer => {
+        const visible = canViewSectionClient(viewer.id, ownerId, section);
+        return `
+          <label>
+            <input type="checkbox" data-ctx-section-vis="${ownerId}:${section}:${viewer.id}" ${visible ? "checked" : ""}>
+            ${escapeHtml(viewer.name)} sees this section
+          </label>
+        `;
+      }).join("")
+    : "";
+  const menu = openContextMenu(x, y, `${owner.name}'s ${tabLabel(section) || section} — who sees it`, rows);
+  menu.querySelectorAll("[data-ctx-section-vis]").forEach(node => {
+    node.addEventListener("change", (e) => {
+      const [oId, sec, viewerId] = node.dataset.ctxSectionVis.split(":");
+      setSectionVisibility(oId, sec, viewerId, e.target.checked);
+    });
+  });
 }
 
 // Period tracking is Lua's own data; Jonas only ever sees her days for awareness.
@@ -807,7 +1017,7 @@ async function hydrateFromSupabase() {
   if (syncInFlight) return;
   syncInFlight = true;
   try {
-    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections,shared_with,auth_user_id&order=created_at.asc" });
+    const profiles = await supabaseRequest("profiles", { query: "?select=id,display_name,avatar,avatar_url,color,streak_count,last_active_date,like_jar_amount,complain_jar_amount,xp_penalty,created_at,hidden_sections,shared_with,auth_user_id,is_admin&order=created_at.asc" });
 
     const profileIds = profiles.map((profile) => profile.id);
     if (!profileIds.length) {
@@ -818,7 +1028,7 @@ async function hydrateFromSupabase() {
       return;
     }
     const idFilter = `(${profileIds.join(",")})`;
-    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs, calendarEvents] = await Promise.all([
+    const [tasks, folders, habits, habitLogs, checklistItems, checklistLogs, gratitude, periodLogs, calendarEvents, profileVisibility, sectionVisibility] = await Promise.all([
       supabaseRequest("tasks", { query: `?select=id,profile_id,title,description,task_date,status,sort_order,folder_id,created_at,completed_at,visibility,hidden_from&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("task_folders", { query: `?select=id,profile_id,name,color,sort_order,created_at&profile_id=in.${idFilter}&order=sort_order.asc.nullslast,created_at.asc` }),
       supabaseRequest("habits", { query: `?select=id,profile_id,title,target_count,created_at,visibility,hidden_from&profile_id=in.${idFilter}&archived_at=is.null&order=created_at.asc` }),
@@ -827,7 +1037,9 @@ async function hydrateFromSupabase() {
       supabaseRequest("daily_checklist_logs", { query: `?select=id,checklist_item_id,profile_id,log_date,answer&profile_id=in.${idFilter}` }),
       supabaseRequest("daily_gratitude", { query: `?select=id,profile_id,gratitude_date,note,hidden_from&profile_id=in.${idFilter}&order=gratitude_date.desc` }),
       supabaseRequest("period_logs", { query: `?select=id,profile_id,log_date&profile_id=in.${idFilter}` }),
-      supabaseRequest("calendar_events", { query: "?select=id,title,event_date,event_type,recurring,created_by&order=event_date.asc" })
+      supabaseRequest("calendar_events", { query: "?select=id,title,event_date,event_type,recurring,created_by&order=event_date.asc" }),
+      supabaseRequest("profile_visibility", { query: "?select=viewer_profile_id,target_profile_id,visible" }).catch(() => []),
+      supabaseRequest("section_visibility", { query: "?select=owner_profile_id,section,viewer_profile_id,visible" }).catch(() => [])
     ]);
 
     const uiState = {
@@ -861,6 +1073,8 @@ async function hydrateFromSupabase() {
       gratitude: gratitude.map(mapGratitude),
       periodLogs: periodLogs.map(mapPeriodLog),
       calendarEvents: calendarEvents.map(mapCalendarEvent),
+      profileVisibility: profileVisibility.map(v => ({ viewerId: v.viewer_profile_id, targetId: v.target_profile_id, visible: v.visible })),
+      sectionVisibility: sectionVisibility.map(v => ({ ownerId: v.owner_profile_id, section: v.section, viewerId: v.viewer_profile_id, visible: v.visible })),
       earnedXp: calculateEarnedXpBeforeToday(profileIds, tasks, habits, habitLogs, checklistLogs),
       loading: false,
       activeProfileId: (() => {
@@ -1043,6 +1257,7 @@ function render() {
         </section>
       </main>
       ${state.gratitudeOpen ? renderGratitudeModal() : ""}
+      ${state.adminSettingsOpen ? renderAdminSettingsModal() : ""}
     </div>
   `;
 
@@ -1123,7 +1338,7 @@ function renderSidebarSettings(profile) {
   return `
     <section class="sidebar-settings">
       <div class="field">
-        <label for="profile-name">Name</label>
+        <label for="profile-name">Name${isCurrentUserAdmin() ? '<span class="admin-badge">Admin</span>' : ''}</label>
         <input id="profile-name" value="${escapeHtml(profile.name)}" />
       </div>
       <div class="field">
@@ -1150,6 +1365,11 @@ function renderSidebarSettings(profile) {
         <label for="profile-photo">Profile picture</label>
         <input id="profile-photo" type="file" accept="image/*,.gif" />
       </div>
+      ${isCurrentUserAdmin() ? `
+        <div class="field">
+          <button type="button" class="pill-button primary" data-action="open-admin-settings" style="width: 100%;">🛠️ Admin: Who Sees What</button>
+        </div>
+      ` : ""}
       <div class="settings-actions">
         <button class="pill-button primary" data-action="save-profile">Save</button>
         <button class="pill-button" data-action="reset-demo">Reset</button>
@@ -1157,6 +1377,82 @@ function renderSidebarSettings(profile) {
     </section>
   `;
 }
+
+function renderAdminSettingsModal() {
+  if (!state.adminSettingsOpen) return "";
+  const profiles = state.profiles;
+  return `
+    <div class="modal-backdrop" data-action="close-admin-settings">
+      <section class="settings-modal" role="dialog" aria-modal="true" data-modal>
+        <div class="section-head">
+          <div>
+            <h3>Admin: Who Sees What</h3>
+            <span>Full control over profile visibility and section sharing.</span>
+          </div>
+          <button class="icon-button" data-action="close-admin-settings" title="Close">×</button>
+        </div>
+
+        <div>
+          <h4 style="margin: 0 0 8px;">Profile visibility</h4>
+          <div class="visibility-grid">
+            ${profiles.map(target => `
+              <div class="visibility-row">
+                <strong>${escapeHtml(target.name)}${target.isAdmin ? '<span class="admin-badge">Admin</span>' : ''}</strong>
+                <div class="checkbox-group">
+                  ${profiles.filter(v => v.id !== target.id).map(viewer => `
+                    <label>
+                      <input type="checkbox" data-admin-profile-vis="${viewer.id}:${target.id}" ${canViewProfileClient(viewer.id, target.id) ? "checked" : ""}>
+                      ${escapeHtml(viewer.name)}
+                    </label>
+                  `).join("")}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <div>
+          <h4 style="margin: 0 0 8px;">Section visibility</h4>
+          <div class="visibility-grid">
+            ${profiles.map(owner => `
+              ${["tasks", "habits", "checklist", "gratitude"].map(sec => `
+                <div class="visibility-row">
+                  <strong>${escapeHtml(owner.name)} — ${sec}</strong>
+                  <div class="checkbox-group">
+                    ${profiles.filter(v => v.id !== owner.id).map(viewer => `
+                      <label>
+                        <input type="checkbox" data-admin-section-vis="${owner.id}:${sec}:${viewer.id}" ${canViewSectionClient(viewer.id, owner.id, sec) ? "checked" : ""}>
+                        ${escapeHtml(viewer.name)}
+                      </label>
+                    `).join("")}
+                  </div>
+                </div>
+              `).join("")}
+            `).join("")}
+          </div>
+        </div>
+
+        <div>
+          <h4 style="margin: 0 0 8px;">Make admin</h4>
+          <div class="visibility-grid">
+            <div class="visibility-row">
+              <strong>Grant admin powers</strong>
+              <div class="checkbox-group">
+                ${profiles.map(p => `
+                  <label>
+                    <input type="checkbox" data-admin-grant="${p.id}" ${p.isAdmin ? "checked" : ""}>
+                    ${escapeHtml(p.name)}
+                  </label>
+                `).join("")}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 
 function renderDailyGif() {
   return `
@@ -1558,7 +1854,7 @@ function renderTasks() {
   }
 
   return `
-    <div class="section-head">
+    <div class="section-head" data-section-name="tasks">
       <div>
         <h3>Tasks</h3>
       </div>
@@ -1620,7 +1916,7 @@ function renderChecklist() {
   const habits = byProfile(state.habits).filter(h => canViewItem(h.profileId, h.visibility)).sort(compareItems);
   const checks = byProfile(state.checklist).filter(c => canViewItem(c.profileId, c.visibility)).sort(compareItems);
   return `
-    <div class="section-head">
+    <div class="section-head" data-section-name="checklist">
       <div>
         <h3>Checklist</h3>
         <span>Habits and daily statements to confirm before the day closes.</span>
@@ -1787,7 +2083,7 @@ function renderOverview(profile) {
   }
 
   const gratitudeCardHtml = (isLuabubu || isJonashi) ? `
-    <button type="button" class="overview-card gratitude-trigger-card" data-action="open-gratitude">
+    <button type="button" class="overview-card gratitude-trigger-card" data-action="open-gratitude" data-section-name="gratitude">
       <strong>Gratitude</strong>
     </button>
   ` : "";
@@ -1825,18 +2121,38 @@ function renderOverview(profile) {
 
 function bindEvents() {
 
-  const deviceOwnerSelect = document.querySelector("#device-owner");
-  if (deviceOwnerSelect) {
-    deviceOwnerSelect.addEventListener("change", (e) => {
-      deviceOwnerId = e.target.value;
-      if (deviceOwnerId) {
-        localStorage.setItem("traquea-monos-device-owner", deviceOwnerId);
-      } else {
-        localStorage.removeItem("traquea-monos-device-owner");
-      }
-      render();
+  document.querySelectorAll("[data-admin-profile-vis]").forEach(node => {
+    node.addEventListener("change", (e) => {
+      const [viewerId, targetId] = node.dataset.adminProfileVis.split(":");
+      setProfileVisibility(viewerId, targetId, e.target.checked);
     });
-  }
+  });
+
+  document.querySelectorAll("[data-admin-section-vis]").forEach(node => {
+    node.addEventListener("change", (e) => {
+      const [ownerId, sec, viewerId] = node.dataset.adminSectionVis.split(":");
+      setSectionVisibility(ownerId, sec, viewerId, e.target.checked);
+    });
+  });
+
+  document.querySelectorAll("[data-admin-grant]").forEach(node => {
+    node.addEventListener("change", async (e) => {
+      const targetId = node.dataset.adminGrant;
+      const target = state.profiles.find(p => p.id === targetId);
+      if (!target) return;
+      target.isAdmin = e.target.checked;
+      render();
+      try {
+        await supabaseRequest(`profiles?id=eq.${targetId}`, {
+          method: "PATCH",
+          body: { is_admin: e.target.checked },
+          prefer: "return=minimal"
+        });
+      } catch (err) {
+        notify("Failed to update admin status.");
+      }
+    });
+  });
 
   document.querySelectorAll("[data-section-hide]").forEach(node => {
     node.addEventListener("change", async (e) => {
@@ -1886,49 +2202,6 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-hide-from-toggle]").forEach(node => {
-    node.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const key = node.dataset.hideFromToggle;
-      document.querySelectorAll("[data-hide-from-menu]").forEach(menu => {
-        menu.style.display = menu.dataset.hideFromMenu === key ? (menu.style.display === "none" ? "block" : "none") : "none";
-      });
-    });
-  });
-
-  document.querySelectorAll("[data-hide-item]").forEach(node => {
-    node.addEventListener("change", async (e) => {
-      e.stopPropagation();
-      const [table, itemId, targetProfileId] = node.dataset.hideItem.split(":");
-      const collectionName = table === "checklist_items" ? "checklist" : table;
-      const item = state[collectionName].find(i => i.id === itemId);
-      if (!item) return;
-      const isChecked = e.target.checked;
-      let hiddenFrom = item.hiddenFrom || [];
-      if (isChecked && !hiddenFrom.includes(targetProfileId)) {
-        hiddenFrom = [...hiddenFrom, targetProfileId];
-      } else if (!isChecked) {
-        hiddenFrom = hiddenFrom.filter(id => id !== targetProfileId);
-      }
-      item.hiddenFrom = hiddenFrom;
-      try {
-        await supabaseRequest(`${table}?id=eq.${itemId}`, {
-          method: "PATCH",
-          body: { hidden_from: hiddenFrom }
-        });
-      } catch (err) {
-        notify("Failed to save privacy.");
-      }
-    });
-  });
-
-  if (!window.__hideFromCloseBound) {
-    window.__hideFromCloseBound = true;
-    document.addEventListener("click", () => {
-      document.querySelectorAll("[data-hide-from-menu]").forEach(menu => { menu.style.display = "none"; });
-    });
-  }
-
   document.querySelectorAll("[data-hide-gratitude]").forEach(node => {
     node.addEventListener("change", async (e) => {
       const [gratitudeId, targetProfileId] = node.dataset.hideGratitude.split(":");
@@ -1962,11 +2235,56 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll("[data-section-name]").forEach((node) => {
+    node.addEventListener("contextmenu", (event) => {
+      const owner = activeProfile();
+      if (!owner) return;
+      event.preventDefault();
+      openSectionVisibilityMenu(event.clientX, event.clientY, owner.id, node.dataset.sectionName);
+    });
+  });
+
   document.querySelectorAll("[data-profile]").forEach((node) => {
     node.addEventListener("click", () => setState({ activeProfileId: node.dataset.profile, sidebarOpen: false, ...closeOpenForms() }));
     node.addEventListener("contextmenu", (event) => {
       event.preventDefault();
-      deleteProfile(node.dataset.profile);
+      const targetId = node.dataset.profile;
+      const target = state.profiles.find(p => p.id === targetId);
+      if (!target) return;
+      if (isCurrentUserAdmin()) {
+        const others = state.profiles.filter(p => p.id !== targetId);
+        const rows = `
+          ${others.length ? others.map(viewer => {
+            const visible = canViewProfileClient(viewer.id, targetId);
+            return `
+              <label>
+                <input type="checkbox" data-ctx-profile-vis="${viewer.id}:${targetId}" ${visible ? "checked" : ""}>
+                👁️ ${escapeHtml(viewer.name)} can see ${escapeHtml(target.name)}
+              </label>
+            `;
+          }).join("") : `<div class="context-menu-empty">No other profiles yet.</div>`}
+          <label style="border-top: 2px solid var(--line); margin-top: 4px; padding-top: 8px;">
+            <input type="checkbox" data-ctx-delete-profile="${targetId}">
+            🗑️ Delete ${escapeHtml(target.name)}
+          </label>
+        `;
+        const menu = openContextMenu(event.clientX, event.clientY, `Who can see ${target.name}?`, rows);
+        menu.querySelectorAll("[data-ctx-profile-vis]").forEach(box => {
+          box.addEventListener("change", (e) => {
+            const [viewerId, tId] = box.dataset.ctxProfileVis.split(":");
+            setProfileVisibility(viewerId, tId, e.target.checked);
+          });
+        });
+        const deleteBox = menu.querySelector("[data-ctx-delete-profile]");
+        if (deleteBox) {
+          deleteBox.addEventListener("change", () => {
+            closeContextMenu();
+            deleteProfile(deleteBox.dataset.ctxDeleteProfile);
+          });
+        }
+      } else {
+        deleteProfile(targetId);
+      }
     });
     node.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -2000,7 +2318,19 @@ function bindEvents() {
       cancelPendingOpen();
       deleteItem(node.dataset.deleteKind, node.dataset.deleteId);
     };
-    node.addEventListener("contextmenu", deleteFromCard);
+    const rightClickMenu = (event) => {
+      if (event.target.closest("button, input, textarea, label")) return;
+      event.preventDefault();
+      cancelPendingOpen();
+      const kind = node.dataset.deleteKind;
+      if (kind === "tasks" || kind === "habits" || kind === "checklist") {
+        const table = kind === "checklist" ? "checklist_items" : kind;
+        openItemHideMenu(event.clientX, event.clientY, table, node.dataset.deleteId);
+      } else {
+        deleteFromCard(event);
+      }
+    };
+    node.addEventListener("contextmenu", rightClickMenu);
     node.addEventListener("dblclick", deleteFromCard);
     node.addEventListener("pointerup", (event) => {
       if (event.pointerType === "mouse" || event.target.closest("button, input, textarea, label")) return;
@@ -2150,6 +2480,8 @@ function handleAction(action) {
   if (action === "open-sidebar") setState({ sidebarOpen: true });
   if (action === "close-sidebar") setState({ sidebarOpen: false });
   if (action === "toggle-settings") setState({ settingsOpen: !state.settingsOpen });
+  if (action === "open-admin-settings") setState({ adminSettingsOpen: true });
+  if (action === "close-admin-settings") setState({ adminSettingsOpen: false });
   if (action === "toggle-monkey-mode") toggleMonkeyMode();
   if (action === "toggle-dark-mode") {
     darkModeEnabled = !darkModeEnabled;
@@ -2688,11 +3020,40 @@ async function persistChecklistLog(item, answer) {
   }
 }
 
+// Trackeamonos-styled confirm dialog, replaces window.confirm's ugly native
+// popup for destructive actions. Returns a Promise<boolean>.
+function styledConfirm(message, { title = "Are you sure?", confirmLabel = "Delete", danger = true } = {}) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = `
+      <section class="gratitude-modal" role="dialog" aria-modal="true" data-modal>
+        <div class="section-head">
+          <h3>${escapeHtml(title)}</h3>
+        </div>
+        <p style="margin: 0; color: var(--ink);">${escapeHtml(message)}</p>
+        <div style="display:flex; gap:10px; justify-self:end;">
+          <button class="pill-button" data-confirm-cancel>Cancel</button>
+          <button class="pill-button ${danger ? "" : "primary"}" data-confirm-ok style="${danger ? "background:var(--red); border-color:var(--red); color:#fff;" : ""}">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(backdrop);
+    const cleanup = (result) => { backdrop.remove(); resolve(result); };
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) cleanup(false); });
+    backdrop.querySelector("[data-confirm-cancel]").addEventListener("click", () => cleanup(false));
+    backdrop.querySelector("[data-confirm-ok]").addEventListener("click", () => cleanup(true));
+    document.addEventListener("keydown", function onKey(e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", onKey); cleanup(false); }
+    });
+  });
+}
+
 async function deleteItem(kind, id) {
   const collectionName = collectionForKind(kind);
   const table = tableForKind(kind);
   if (!collectionName || !table) return;
-  if (!window.confirm("Delete this item?")) return;
+  if (!(await styledConfirm("Delete this item? This can't be undone.", { title: "Delete item" }))) return;
 
   const deletedTask = kind === "tasks" ? state[collectionName].find((item) => item.id === id) : null;
   state[collectionName] = state[collectionName].filter((item) => item.id !== id);
@@ -2728,7 +3089,7 @@ async function deleteItem(kind, id) {
 async function deleteProfile(id) {
   const profile = state.profiles.find((item) => item.id === id);
   if (!profile) return;
-  if (!window.confirm(`Delete ${profile.name}? This removes their tasks, habits, checklist items, and gratitude.`)) return;
+  if (!(await styledConfirm(`Delete ${profile.name}? This removes their tasks, habits, checklist items, and gratitude.`, { title: "Delete profile" }))) return;
 
   const remainingProfiles = state.profiles.filter((item) => item.id !== id);
   state = {
