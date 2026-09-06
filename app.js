@@ -1481,7 +1481,9 @@ function hashString(value) {
 function latestGratitudeByName(name) {
   const owner = findProfileByName(name);
   if (!owner) return null;
-  const entries = (state.gratitude || []).filter(g => !g.hiddenFrom || !g.hiddenFrom.includes(deviceOwnerId))
+  const me = myProfile();
+  const myId = me ? me.id : null;
+  const entries = (state.gratitude || []).filter(g => !g.hiddenFrom || !g.hiddenFrom.includes(myId))
     .filter((item) => item.profileId === owner.id && item.text && item.text.trim())
     .sort((a, b) => b.date.localeCompare(a.date));
   if (!entries.length) return null;
