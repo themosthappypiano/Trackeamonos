@@ -2926,13 +2926,15 @@ async function addChecklist(event) {
 
 async function addProfile() {
   const number = state.profiles.length + 1;
+  const me = myProfile();
   let profile = {
     id: uid("profile"),
     name: `Player ${number}`,
     color: ["#16a56f", "#2476d9", "#e25b45", "#f4b83b"][number % 4],
     avatar: String(number),
     photo: "",
-    streak: 0
+    streak: 0,
+    authUserId: me ? null : (currentSession ? currentSession.user.id : null)
   };
   try {
     const rows = await supabaseRequest("profiles", {
@@ -2942,7 +2944,8 @@ async function addProfile() {
         avatar: profile.avatar,
         avatar_url: null,
         color: profile.color,
-        streak_count: 0
+        streak_count: 0,
+        auth_user_id: profile.authUserId
       }
     });
     profile = mapProfile(rows[0]);
