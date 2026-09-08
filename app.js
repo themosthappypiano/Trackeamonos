@@ -1,4 +1,3 @@
-const TASK_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
 const localDateKey = (date = new Date()) => {
   const local = date instanceof Date ? date : new Date(date);
   const year = local.getFullYear();
@@ -1884,7 +1883,7 @@ function renderTasks() {
           <input id="task-title" placeholder="Task name" required />
           <textarea id="task-description" placeholder="Description optional"></textarea>
           <input id="task-date" type="date" value="${today()}" />
-          <select id="task-duration" title="How long will this take?">${TASK_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${minutes === 30 ? "selected" : ""}>${formatDurationMinutes(minutes)}</option>`).join("")}</select>
+          <input id="task-duration" type="number" min="1" step="1" placeholder="Duration (minutes)" value="30" title="How long will this take? (minutes)" />
           <input type="hidden" id="task-folder" value="${openFolder.id}" />
           <button class="pill-button primary" type="submit">Create</button>
         </form>
