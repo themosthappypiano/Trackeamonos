@@ -171,6 +171,30 @@ function renderTikTikSchedule() {
     </div>`;
 }
 
+// Finds the first free slot in today's schedule that fits a block of the
+// given duration, packed after any already-scheduled tasks.
+function nextAvailableScheduleSlot(durationMinutes) {
+  const schedule = tikTikState().schedule;
+  const entries = Object.values(schedule).sort((a, b) => a.start - b.start);
+  let start = TIKTIK_DAY_START;
+  for (const entry of entries) {
+    const entryEnd = entry.start + (entry.duration || TIKTIK_MIN_DURATION);
+    if (start + durationMinutes <= entry.start) break;
+    if (entryEnd > start) start = entryEnd;
+  }
+  return Math.max(TIKTIK_DAY_START, Math.min(start, TIKTIK_DAY_END - durationMinutes));
+}
+
+// Drops a newly created task straight onto today's schedule with its chosen
+// duration, so the user doesn't have to drag it in from the task bank.
+function scheduleTask(taskId, durationMinutes) {
+  ensureFreshSchedule();
+  const duration = Math.max(TIKTIK_MIN_DURATION, Math.round(durationMinutes || TIKTIK_MIN_DURATION));
+  const start = nextAvailableScheduleSlot(duration);
+  tikTikState().schedule[taskId] = { start, duration };
+  persistTikTik();
+}
+
 function persistTikTik() { saveState(); }
 
 function toggleTikTikTimer(taskId) {
