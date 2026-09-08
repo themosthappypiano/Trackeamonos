@@ -1883,7 +1883,8 @@ function renderTasks() {
           <input id="task-title" placeholder="Task name" required />
           <textarea id="task-description" placeholder="Description optional"></textarea>
           <input id="task-date" type="date" value="${today()}" />
-          <input id="task-duration" type="number" min="1" step="1" placeholder="Duration (minutes)" value="30" title="How long will this take? (minutes)" />
+          <input id="task-start" type="time" title="Schedule start time" />
+          <input id="task-end" type="time" title="Schedule end time" />
           <input type="hidden" id="task-folder" value="${openFolder.id}" />
           <button class="pill-button primary" type="submit">Create</button>
         </form>
@@ -1909,7 +1910,8 @@ function renderTasks() {
         <input id="task-title" placeholder="Task name" required />
         <textarea id="task-description" placeholder="Description optional"></textarea>
         <input id="task-date" type="date" value="${today()}" />
-        <select id="task-duration" title="How long will this take?">${TASK_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${minutes === 30 ? "selected" : ""}>${formatDurationMinutes(minutes)}</option>`).join("")}</select>
+        <input id="task-start" type="time" title="Schedule start time" />
+        <input id="task-end" type="time" title="Schedule end time" />
         <input type="hidden" id="task-folder" value="" />
         <button class="pill-button primary" type="submit">Create</button>
       </form>
@@ -2798,7 +2800,8 @@ async function addTask(event) {
   const title = document.querySelector("#task-title").value.trim();
   const description = (document.querySelector("#task-description")?.value || "").trim();
   const date = document.querySelector("#task-date").value || today();
-  const duration = Number(document.querySelector("#task-duration")?.value) || 30;
+  const startTime = document.querySelector("#task-start")?.value || "";
+  const endTime = document.querySelector("#task-end")?.value || "";
   const folderId = document.querySelector("#task-folder")?.value || null;
   if (!title) return;
   const profile = activeProfile();
@@ -2827,7 +2830,11 @@ async function addTask(event) {
   }
   state.tasks.push(task);
   state.taskFormOpen = false;
-  scheduleTask(task.id, duration);
+  if (startTime && endTime) {
+    scheduleTaskAt(task.id, startTime, endTime);
+  } else {
+    scheduleTask(task.id, 30);
+  }
   saveState();
   render();
   notify(date > today() ? "Future task saved. It will appear on that day." : "Task added.");

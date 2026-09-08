@@ -195,6 +195,21 @@ function scheduleTask(taskId, durationMinutes) {
   persistTikTik();
 }
 
+function timeStringToMinutes(value) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+// Drops a newly created task onto today's schedule at the exact start/end
+// time the user chose, instead of auto-packing it after other tasks.
+function scheduleTaskAt(taskId, startTime, endTime) {
+  ensureFreshSchedule();
+  const start = Math.max(TIKTIK_DAY_START, Math.min(timeStringToMinutes(startTime), TIKTIK_DAY_END - TIKTIK_MIN_DURATION));
+  const end = Math.min(TIKTIK_DAY_END, Math.max(timeStringToMinutes(endTime), start + TIKTIK_MIN_DURATION));
+  tikTikState().schedule[taskId] = { start, duration: end - start };
+  persistTikTik();
+}
+
 function persistTikTik() { saveState(); }
 
 function toggleTikTikTimer(taskId) {
