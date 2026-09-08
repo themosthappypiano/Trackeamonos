@@ -809,35 +809,54 @@ function getPeriodStartDates(profileId) {
   return dates.filter((date, index) => index === 0 || dateKeyDiffDays(date, dates[index - 1]) > 1);
 }
 
-// Predicts the next period start from the last logged start date, assuming a
-// fixed 28-day cycle (not the averaged cycle length used for ovulation).
-function getPredictedPeriodDate(profileId) {
+// Average cycle length from logged period starts (21-35 day clamp), defaulting to 28.
+function getAverageCycleLength(profileId) {
   const starts = getPeriodStartDates(profileId);
-  if (!starts.length) return null;
-  const lastStart = starts[starts.length - 1];
-  return addDaysToDateKey(lastStart, 28);
+  if (starts.length < 2) return 28;
+  const gaps = starts.slice(1).map((date, index) => dateKeyDiffDays(date, starts[index]));
+  const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+  return Math.min(35, Math.max(21, Math.round(avgGap)));
 }
 
-// Predicts the full 5-day span of the next period, starting from getPredictedPeriodDate.
+// Predicts every future period start from the last logged start date, repeating the
+// average cycle length until the given end date (inclusive), capped at 2028-12-31.
+const PERIOD_PREDICTION_HORIZON = "2028-12-31";
+function getPredictedPeriodStarts(profileId, endDateKey = PERIOD_PREDICTION_HORIZON) {
+  const starts = getPeriodStartDates(profileId);
+  if (!starts.length) return [];
+  const cycleLength = getAverageCycleLength(profileId);
+  const horizon = endDateKey < PERIOD_PREDICTION_HORIZON ? endDateKey : PERIOD_PREDICTION_HORIZON;
+  const predicted = [];
+  let next = addDaysToDateKey(starts[starts.length - 1], cycleLength);
+  while (next <= horizon) {
+    predicted.push(next);
+    next = addDaysToDateKey(next, cycleLength);
+  }
+  return predicted;
+}
+
+// Predicts the next period start from the last logged start date, assuming the
+// profile's average cycle length (fixed 28-day cycle when not enough data).
+function getPredictedPeriodDate(profileId) {
+  return getPredictedPeriodStarts(profileId)[0] || null;
+}
+
+// Predicts the full 5-day span of every future period through 2028-12-31.
 function getPredictedPeriodDates(profileId) {
-  const start = getPredictedPeriodDate(profileId);
-  if (!start) return [];
-  return Array.from({ length: 5 }, (_, index) => addDaysToDateKey(start, index));
+  return getPredictedPeriodStarts(profileId)
+    .flatMap((start) => Array.from({ length: 5 }, (_, index) => addDaysToDateKey(start, index)));
+}
+
+// Predicts every future ovulation day through 2028-12-31: ~14 days before each
+// predicted period start, using the average cycle length if known.
+function getPredictedOvulationDates(profileId) {
+  return getPredictedPeriodStarts(profileId).map((start) => addDaysToDateKey(start, -14));
 }
 
 // Predicts the upcoming ovulation day from logged period start dates: ~14 days
 // before the next expected period, using the average cycle length if known.
 function getPredictedOvulationDate(profileId) {
-  const starts = getPeriodStartDates(profileId);
-  if (!starts.length) return null;
-  const lastStart = starts[starts.length - 1];
-  let cycleLength = 28;
-  if (starts.length >= 2) {
-    const gaps = starts.slice(1).map((date, index) => dateKeyDiffDays(date, starts[index]));
-    const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
-    cycleLength = Math.min(35, Math.max(21, Math.round(avgGap)));
-  }
-  return addDaysToDateKey(lastStart, cycleLength - 14);
+  return getPredictedOvulationDates(profileId)[0] || null;
 }
 
 function setState(patch) {
@@ -1594,7 +1613,7 @@ function renderCalendarDayDetail(dateKey) {
   const isPeriodDay = sourceProfile
     ? (state.periodLogs || []).some((log) => log.profileId === sourceProfile.id && log.date === dateKey)
     : false;
-  const isOvulationDay = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) === dateKey : false;
+  const isOvulationDay = sourceProfile ? getPredictedOvulationDates(sourceProfile.id).includes(dateKey) : false;
   const canToggle = isLuabubuProfile(activeProfile());
 
   const dayEvents = calendarEventsOnDateKey(dateKey);
@@ -1767,12 +1786,12 @@ function renderCalendar() {
         const periodDates = sourceProfile
           ? new Set((state.periodLogs || []).filter((log) => log.profileId === sourceProfile.id).map((log) => log.date))
           : new Set();
-        const ovulationDate = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) : null;
+        const ovulationDates = new Set(sourceProfile ? getPredictedOvulationDates(sourceProfile.id) : []);
         const predictedPeriodDates = new Set(sourceProfile ? getPredictedPeriodDates(sourceProfile.id) : []);
         return daysArray.map((day) => {
           const dateKey = dateKeyForDay(day);
           const isPeriodDay = periodDates.has(dateKey);
-          const isOvulationDay = !isPeriodDay && ovulationDate === dateKey;
+          const isOvulationDay = !isPeriodDay && ovulationDates.has(dateKey);
           const isPredictedPeriodDay = !isPeriodDay && predictedPeriodDates.has(dateKey);
           const dayEvents = calendarEventsOnDateKey(dateKey);
           const hasBirthday = dayEvents.some((item) => item.type === "birthday");
