@@ -1030,6 +1030,18 @@ textarea {
   min-width: 0;
 }
 
+.task-toggle-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.task-toggle-row:empty {
+  display: none;
+}
+
 .item-title strong {
   display: block;
   overflow-wrap: anywhere;
