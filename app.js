@@ -1765,7 +1765,7 @@ function renderCalendar() {
     ${state.eventFormOpen ? `
       <form class="add-card" id="event-form">
         <input id="event-title" placeholder="What's the event?" required />
-        <input id="event-date" type="date" value="${todayKey}" />
+        <input id="event-date" type="date" value="${state.selectedDay || todayKey}" />
         <button class="pill-button primary" type="submit">Save</button>
       </form>
     ` : ""}
