@@ -1191,6 +1191,17 @@ textarea {
   color: white;
 }
 
+.status-dot.track {
+  background: var(--panel);
+  color: var(--ink);
+  opacity: 1;
+}
+
+.status-dot.track.active {
+  background: var(--pink);
+  color: var(--ink);
+}
+
 .toast {
   position: fixed;
   z-index: 50;

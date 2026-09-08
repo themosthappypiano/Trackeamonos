@@ -131,6 +131,14 @@ function renderTikTikTimer() {
     </div>`;
 }
 
+// Small ▶/■ timer toggle reused on task rows in the Tasks section itself,
+// so tracking a task doesn't require switching to the Time tracker tab.
+function renderTaskTrackButton(task) {
+  const timer = tikTikState().timers[task.id];
+  const isRunning = !!timer?.running;
+  return `<button class="status-dot track ${isRunning ? "active" : ""}" data-tiktik-action="toggle-timer" data-task-id="${task.id}" title="${isRunning ? `Stop (${secondsToClock(elapsedForTimer(timer))})` : "Start tracking"}">${isRunning ? "■" : "▶"}</button>`;
+}
+
 function renderTikTikSchedule() {
   const profile = activeProfile();
   if (!profile) return "";

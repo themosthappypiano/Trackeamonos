@@ -1852,6 +1852,7 @@ function renderTaskItem(task) {
           </select>
           <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
           <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
+          ${renderTaskTrackButton(task)}
         </div>
       </div>
     </article>
