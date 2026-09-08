@@ -893,6 +893,14 @@ function compareItems(a, b) {
 }
 
 function compareTasks(a, b) {
+  const aDone = a.status === "done";
+  const bDone = b.status === "done";
+  if (aDone !== bDone) return aDone ? 1 : -1;
+
+  const aInProgress = a.status === "in_progress";
+  const bInProgress = b.status === "in_progress";
+  if (aInProgress !== bInProgress) return aInProgress ? -1 : 1;
+
   const aHasOrder = Number.isInteger(a.sortOrder);
   const bHasOrder = Number.isInteger(b.sortOrder);
   if (aHasOrder && bHasOrder && a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
