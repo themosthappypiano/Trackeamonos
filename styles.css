@@ -706,6 +706,10 @@ textarea {
   gap: 10px;
 }
 
+.item-list:has(.task-item) {
+  gap: 4px;
+}
+
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1008,6 +1012,8 @@ textarea {
   align-items: center;
   touch-action: pan-y;
   cursor: grab;
+  gap: 2px 10px;
+  padding: 6px 10px;
 }
 
 .task-item.ready {
@@ -1030,8 +1036,14 @@ textarea {
   min-width: 0;
 }
 
+.task-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .task-toggle-row {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: flex-end;

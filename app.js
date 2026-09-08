@@ -1838,19 +1838,21 @@ function renderTaskItem(task) {
         ${task.status === "ready" ? "" : `<span>${statusLabel(task.status)}</span>`}
         ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ""}
       </div>
-      <div class="task-toggle-row">
-        ${renderVisibilityToggle(task, "tasks")}
-        ${renderHideFromControl(task, "tasks")}
-      </div>
-              <div class="task-actions">
-        <select class="task-folder-select" data-task-folder="${task.id}" title="Move to folder">
-          <option value="">No folder</option>
-          ${byProfile(state.folders).sort(compareTasks).map((folder) => `
-            <option value="${folder.id}" ${folder.id === task.folderId ? "selected" : ""}>${escapeHtml(folder.name)}</option>
-          `).join("")}
-        </select>
-        <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
-        <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
+      <div class="task-side">
+        <div class="task-toggle-row">
+          ${renderVisibilityToggle(task, "tasks")}
+          ${renderHideFromControl(task, "tasks")}
+        </div>
+        <div class="task-actions">
+          <select class="task-folder-select" data-task-folder="${task.id}" title="Move to folder">
+            <option value="">No folder</option>
+            ${byProfile(state.folders).sort(compareTasks).map((folder) => `
+              <option value="${folder.id}" ${folder.id === task.folderId ? "selected" : ""}>${escapeHtml(folder.name)}</option>
+            `).join("")}
+          </select>
+          <button class="status-dot progress ${task.status === "in_progress" ? "active" : ""}" data-task-status="${task.id}:in_progress" title="In progress"></button>
+          <button class="status-dot complete ${task.status === "done" ? "active" : ""}" data-task-status="${task.id}:done" title="Done">✓</button>
+        </div>
       </div>
     </article>
   `;
