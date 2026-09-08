@@ -818,6 +818,13 @@ function getPredictedPeriodDate(profileId) {
   return addDaysToDateKey(lastStart, 28);
 }
 
+// Predicts the full 5-day span of the next period, starting from getPredictedPeriodDate.
+function getPredictedPeriodDates(profileId) {
+  const start = getPredictedPeriodDate(profileId);
+  if (!start) return [];
+  return Array.from({ length: 5 }, (_, index) => addDaysToDateKey(start, index));
+}
+
 // Predicts the upcoming ovulation day from logged period start dates: ~14 days
 // before the next expected period, using the average cycle length if known.
 function getPredictedOvulationDate(profileId) {
@@ -1761,12 +1768,12 @@ function renderCalendar() {
           ? new Set((state.periodLogs || []).filter((log) => log.profileId === sourceProfile.id).map((log) => log.date))
           : new Set();
         const ovulationDate = sourceProfile ? getPredictedOvulationDate(sourceProfile.id) : null;
-        const predictedPeriodDate = sourceProfile ? getPredictedPeriodDate(sourceProfile.id) : null;
+        const predictedPeriodDates = new Set(sourceProfile ? getPredictedPeriodDates(sourceProfile.id) : []);
         return daysArray.map((day) => {
           const dateKey = dateKeyForDay(day);
           const isPeriodDay = periodDates.has(dateKey);
           const isOvulationDay = !isPeriodDay && ovulationDate === dateKey;
-          const isPredictedPeriodDay = !isPeriodDay && predictedPeriodDate === dateKey;
+          const isPredictedPeriodDay = !isPeriodDay && predictedPeriodDates.has(dateKey);
           const dayEvents = calendarEventsOnDateKey(dateKey);
           const hasBirthday = dayEvents.some((item) => item.type === "birthday");
           const hasEvent = dayEvents.some((item) => item.type === "event");
@@ -1775,7 +1782,7 @@ function renderCalendar() {
           const titleParts = [
             isPeriodDay ? "Period day" : "",
             isOvulationDay ? "Predicted ovulation day" : "",
-            isPredictedPeriodDay ? "Predicted period day (28-day cycle)" : "",
+            isPredictedPeriodDay ? "Predicted period (28-day cycle)" : "",
             ...dayEvents.map((item) => item.type === "birthday" ? `🎂 ${item.title}` : `📌 ${item.title}`),
             showMoon ? moonPhase.label : ""
           ].filter(Boolean);
