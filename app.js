@@ -2088,7 +2088,7 @@ function renderOverview(profile) {
             </div>
           </div>
           <div class="jar-total">€${likeJarAmount.toFixed(2)}</div>
-          <button class="like-btn" data-action="like-jar-hit" ${likeJarFull ? "disabled" : ""}>
+          <button class="like-btn" data-action="like-jar-hit">
             ${likeJarFull ? `Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : `She said "Like"`}
           </button>
           <span class="reset-jar-btn" data-action="like-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
@@ -2118,7 +2118,7 @@ function renderOverview(profile) {
             </div>
           </div>
           <div class="jar-total">€${complainJarAmount.toFixed(2)}</div>
-          <button class="complain-btn" data-action="complain-jar-hit" ${complainJarFull ? "disabled" : ""}>
+          <button class="complain-btn" data-action="complain-jar-hit">
             ${complainJarFull ? `Jar full (-${JAR_OVERFLOW_PENALTY} XP)` : "He complained"}
           </button>
           <span class="reset-jar-btn" data-action="complain-jar-reset" style="font-size: 11px; opacity: 0.5; margin-top: 6px; cursor: pointer; text-decoration: underline;">reset jar</span>
@@ -2599,10 +2599,18 @@ async function hitLikeJar() {
   if (!profile) return;
 
   const prevAmount = profile.likeJarAmount || 0;
-  if (prevAmount >= JAR_CAPACITY) return;
-  const nextAmount = Math.min(prevAmount + 0.10, JAR_CAPACITY);
-  const justFilled = nextAmount >= JAR_CAPACITY;
   const levelsLost = Math.floor(JAR_OVERFLOW_PENALTY / 100);
+
+  // Jar was already at/over capacity from an earlier click (e.g. a fill that got
+  // rounded up to capacity in the DB before the overflow penalty could fire) —
+  // treat this click as collecting the overdue penalty instead of a silent no-op.
+  const justFilled = prevAmount >= JAR_CAPACITY
+    ? true
+    : Math.round((prevAmount + 0.10) * 100) / 100 >= JAR_CAPACITY;
+  const displayAmount = justFilled ? JAR_CAPACITY : Math.round((prevAmount + 0.10) * 100) / 100;
+  // Drain the jar back to 0 as soon as the penalty is collected, so it never sits
+  // stuck at capacity waiting for a click that could otherwise double-charge it.
+  const nextAmount = justFilled ? 0 : displayAmount;
 
   if (justFilled) {
     const proceed = window.confirm(`Luabubu's Like Jar is about to fill up. This applies a -${JAR_OVERFLOW_PENALTY} XP penalty (~${levelsLost} levels). Continue?`);
@@ -2623,7 +2631,7 @@ async function hitLikeJar() {
   if (jarWrapper && piggyJar && jarTotal && coinPile) {
     const coin = document.createElement("div");
     coin.className = "dropping-coin";
-    coin.dataset.targetAmount = nextAmount.toFixed(2);
+    coin.dataset.targetAmount = displayAmount.toFixed(2);
     const randomLeft = 40 + Math.random() * 40;
     coin.style.left = `${randomLeft}px`;
     jarWrapper.appendChild(coin);
@@ -2699,10 +2707,18 @@ async function hitComplainJar() {
   if (!profile) return;
 
   const prevAmount = profile.complainJarAmount || 0;
-  if (prevAmount >= JAR_CAPACITY) return;
-  const nextAmount = Math.min(prevAmount + 0.10, JAR_CAPACITY);
-  const justFilled = nextAmount >= JAR_CAPACITY;
   const levelsLost = Math.floor(JAR_OVERFLOW_PENALTY / 100);
+
+  // Jar was already at/over capacity from an earlier click (e.g. a fill that got
+  // rounded up to capacity in the DB before the overflow penalty could fire) —
+  // treat this click as collecting the overdue penalty instead of a silent no-op.
+  const justFilled = prevAmount >= JAR_CAPACITY
+    ? true
+    : Math.round((prevAmount + 0.10) * 100) / 100 >= JAR_CAPACITY;
+  const displayAmount = justFilled ? JAR_CAPACITY : Math.round((prevAmount + 0.10) * 100) / 100;
+  // Drain the jar back to 0 as soon as the penalty is collected, so it never sits
+  // stuck at capacity waiting for a click that could otherwise double-charge it.
+  const nextAmount = justFilled ? 0 : displayAmount;
 
   if (justFilled) {
     const proceed = window.confirm(`Jonas's Complaint Jar is about to fill up. This applies a -${JAR_OVERFLOW_PENALTY} XP penalty (~${levelsLost} levels). Continue?`);
@@ -2723,7 +2739,7 @@ async function hitComplainJar() {
   if (jarWrapper && piggyJar && jarTotal && coinPile) {
     const coin = document.createElement("div");
     coin.className = "dropping-coin";
-    coin.dataset.targetAmount = nextAmount.toFixed(2);
+    coin.dataset.targetAmount = displayAmount.toFixed(2);
     const randomLeft = 40 + Math.random() * 40;
     coin.style.left = `${randomLeft}px`;
     jarWrapper.appendChild(coin);
