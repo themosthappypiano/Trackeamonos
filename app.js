@@ -2160,9 +2160,11 @@ function renderOverview(profile) {
       <div class="wallet-card ${walletOpen ? "open" : "closed"}">
         <button class="wallet-toggle" type="button" data-action="toggle-wallet-fold" aria-label="Toggle wallet">
           <span class="wallet-body">
-            <span class="wallet-flap"></span>
-            <span class="wallet-stitch"></span>
-            <span class="wallet-snap"></span>
+            <span class="wallet-pouch"></span>
+            <span class="wallet-coin-peek">€</span>
+            <span class="wallet-flap">
+              <span class="wallet-snap"></span>
+            </span>
           </span>
           <span class="wallet-amount">€${walletTotal.toFixed(2)}</span>
         </button>

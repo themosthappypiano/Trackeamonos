@@ -1894,77 +1894,119 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: transparent;
   border: none;
-  padding: 0;
+  padding: 10px 6px 0;
   cursor: pointer;
   font-family: inherit;
 }
 
 .wallet-body {
   position: relative;
-  width: 64px;
-  height: 46px;
-  border-radius: 8px 8px 10px 10px;
-  background: linear-gradient(155deg, #a9764a, #7a4f2b 60%, #6b4423);
-  border: 3px solid var(--ink);
-  box-shadow: 0 4px 0px var(--ink), inset 0 2px 4px rgba(255,255,255,0.15);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  width: 88px;
+  height: 60px;
+  transition: transform 0.15s ease;
 }
 
 .wallet-toggle:hover .wallet-body {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0px var(--ink), inset 0 2px 4px rgba(255,255,255,0.15);
+  transform: translateY(-3px);
 }
 
 .wallet-toggle:active .wallet-body {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0px var(--ink), inset 0 2px 4px rgba(255,255,255,0.15);
+  transform: translateY(1px);
+}
+
+/* Cards peeking out of the top */
+.wallet-body::before,
+.wallet-body::after {
+  content: '';
+  position: absolute;
+  top: -22px;
+  width: 30px;
+  height: 40px;
+  border-radius: 7px;
+  border: 2.5px solid rgba(0,0,0,0.12);
+  box-shadow: inset 0 2px 3px rgba(255,255,255,0.5), 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.wallet-body::before {
+  left: 8px;
+  background: linear-gradient(155deg, #8fd98f, #5cb85c 65%, #489c48);
+  transform: rotate(-14deg);
+  z-index: 1;
+}
+
+.wallet-body::after {
+  left: 26px;
+  background: linear-gradient(155deg, #8fc7f2, #5a9fdb 65%, #4788c2);
+  transform: rotate(-4deg);
+  z-index: 2;
+}
+
+/* Back pouch, peeking below the front flap */
+.wallet-pouch {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: -6px;
+  height: 22px;
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(180deg, #d9702f, #c8611f);
+  box-shadow: inset 0 -4px 6px rgba(0,0,0,0.15);
+  z-index: 3;
+}
+
+/* Coin peeking above the flap */
+.wallet-coin-peek {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff2b8, #f6c445 55%, #d99a1f 100%);
+  border: 2px solid #c9871a;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #8a5a10;
 }
 
 .wallet-flap {
   position: absolute;
-  top: -3px;
-  left: -3px;
-  right: -3px;
-  height: 26px;
-  border-radius: 8px 8px 4px 4px;
-  background: linear-gradient(155deg, #c08e5c, #8a5c34 70%);
-  border: 3px solid var(--ink);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52px;
+  border-radius: 18px 18px 20px 20px;
+  background: linear-gradient(155deg, #ff9a4d, #f2812f 55%, #de6f22);
+  box-shadow: inset 0 3px 5px rgba(255,255,255,0.45), inset 0 -6px 8px rgba(0,0,0,0.12), 0 4px 6px rgba(0,0,0,0.15);
   transform-origin: top center;
-  transform: perspective(200px) rotateX(0deg);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
-  z-index: 2;
+  transform: perspective(220px) rotateX(0deg);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease;
+  z-index: 5;
 }
 
 .wallet-card.open .wallet-flap {
-  transform: perspective(200px) rotateX(-130deg);
-  box-shadow: 0 -2px 6px rgba(0,0,0,0.2);
-}
-
-.wallet-stitch {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  top: 8px;
-  height: 1px;
-  border-top: 2px dashed rgba(255, 255, 255, 0.35);
-  z-index: 1;
+  transform: perspective(220px) rotateX(-125deg);
+  box-shadow: inset 0 3px 5px rgba(255,255,255,0.45), 0 -3px 8px rgba(0,0,0,0.2);
 }
 
 .wallet-snap {
   position: absolute;
-  left: 50%;
+  right: 14px;
   top: 20px;
-  width: 10px;
-  height: 10px;
-  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--yellow);
-  border: 2px solid var(--ink);
-  z-index: 3;
-  box-shadow: inset 0 1px 2px rgba(255,255,255,0.6);
+  background: radial-gradient(circle at 35% 30%, #d7f0f7, #8ecbdb 60%, #5fa3b6 100%);
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.15), inset 0 1px 2px rgba(255,255,255,0.6), 0 1px 2px rgba(0,0,0,0.15);
+  z-index: 6;
 }
 
 .wallet-amount {
