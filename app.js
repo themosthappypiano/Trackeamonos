@@ -2157,18 +2157,23 @@ function renderOverview(profile) {
     const coins = coinsForAmount(walletTotal);
 
     walletHtml = `
-      <div class="wallet-card ${walletOpen ? "open" : "folded"}">
-        <button class="jar-fold-toggle" type="button" data-action="toggle-wallet-fold">
-          <span class="wallet-title">Wallet</span>
-          <span class="jar-fold-right">€${walletTotal.toFixed(2)} <i class="fold-caret">${walletOpen ? "▾" : "▸"}</i></span>
+      <div class="wallet-card ${walletOpen ? "open" : "closed"}">
+        <button class="wallet-toggle" type="button" data-action="toggle-wallet-fold" aria-label="Toggle wallet">
+          <span class="wallet-body">
+            <span class="wallet-flap"></span>
+            <span class="wallet-stitch"></span>
+            <span class="wallet-snap"></span>
+          </span>
+          <span class="wallet-amount">€${walletTotal.toFixed(2)}</span>
         </button>
         ${walletOpen ? `
-          <div class="wallet-coins">
-            ${coins.length ? coins.map(denomination => `
-              <span class="wallet-coin" data-value="${denomination}">${coinLabel(denomination)}</span>
+          <div class="wallet-tray">
+            ${coins.length ? coins.map((denomination, i) => `
+              <span class="wallet-coin" data-value="${denomination}" style="--i:${i}">
+                <span class="wallet-coin-face">${coinLabel(denomination)}</span>
+              </span>
             `).join("") : `<span class="wallet-empty">No coins yet</span>`}
           </div>
-          <div class="jar-total">€${walletTotal.toFixed(2)}</div>
         ` : ""}
       </div>
     `;
