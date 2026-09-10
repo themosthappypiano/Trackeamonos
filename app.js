@@ -91,6 +91,7 @@ function moonPhaseForDateKey(dateKey) {
 
 const LIKE_JAR_OPEN_KEY = "traquea-monos-like-jar-open";
 const COMPLAIN_JAR_OPEN_KEY = "traquea-monos-complain-jar-open";
+const WALLET_OPEN_KEY = "traquea-monos-wallet-open";
 
 function loadFoldOpen(key) {
   try {
@@ -102,6 +103,27 @@ function loadFoldOpen(key) {
 
 let likeJarOpen = loadFoldOpen(LIKE_JAR_OPEN_KEY);
 let complainJarOpen = loadFoldOpen(COMPLAIN_JAR_OPEN_KEY);
+let walletOpen = loadFoldOpen(WALLET_OPEN_KEY);
+
+const COIN_DENOMINATIONS = [2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01];
+
+// Breaks a euro amount into the fewest standard coins (2€ down to 1c), greedily.
+function coinsForAmount(amount) {
+  let cents = Math.round(amount * 100);
+  const coins = [];
+  for (const denomination of COIN_DENOMINATIONS) {
+    const denominationCents = Math.round(denomination * 100);
+    while (cents >= denominationCents) {
+      coins.push(denomination);
+      cents -= denominationCents;
+    }
+  }
+  return coins;
+}
+
+function coinLabel(denomination) {
+  return denomination >= 1 ? `€${denomination}` : `${Math.round(denomination * 100)}c`;
+}
 
 let gifSources = [DEFAULT_GIF_SRC];
 let brandGifSrc = DEFAULT_GIF_SRC;
@@ -2127,13 +2149,38 @@ function renderOverview(profile) {
     `;
   }
 
+  let walletHtml = "";
+  if (isLuabubu || isJonashi) {
+    const jarAmount = isLuabubu ? (profile.likeJarAmount || 0) : (profile.complainJarAmount || 0);
+    const bankedAmount = ((profile.xpPenalty || 0) / JAR_OVERFLOW_PENALTY) * JAR_CAPACITY;
+    const walletTotal = Math.round((jarAmount + bankedAmount) * 100) / 100;
+    const coins = coinsForAmount(walletTotal);
+
+    walletHtml = `
+      <div class="wallet-card ${walletOpen ? "open" : "folded"}">
+        <button class="jar-fold-toggle" type="button" data-action="toggle-wallet-fold">
+          <span class="wallet-title">Wallet</span>
+          <span class="jar-fold-right">€${walletTotal.toFixed(2)} <i class="fold-caret">${walletOpen ? "▾" : "▸"}</i></span>
+        </button>
+        ${walletOpen ? `
+          <div class="wallet-coins">
+            ${coins.length ? coins.map(denomination => `
+              <span class="wallet-coin" data-value="${denomination}">${coinLabel(denomination)}</span>
+            `).join("") : `<span class="wallet-empty">No coins yet</span>`}
+          </div>
+          <div class="jar-total">€${walletTotal.toFixed(2)}</div>
+        ` : ""}
+      </div>
+    `;
+  }
+
   const gratitudeCardHtml = (isLuabubu || isJonashi) ? `
     <button type="button" class="overview-card gratitude-trigger-card" data-action="open-gratitude" data-section-name="gratitude">
       <strong>Gratitude</strong>
     </button>
   ` : "";
 
-  const anyJarOpen = (isLuabubu && likeJarOpen) || (isJonashi && complainJarOpen);
+  const anyJarOpen = (isLuabubu && likeJarOpen) || (isJonashi && complainJarOpen) || ((isLuabubu || isJonashi) && walletOpen);
 
   const restOfOverviewHtml = anyJarOpen ? "" : `
       ${gratitudeCardHtml}
@@ -2159,6 +2206,7 @@ function renderOverview(profile) {
     <aside class="overview ${anyJarOpen ? "jar-expanded" : ""}">
       ${likeJarHtml}
       ${complainJarHtml}
+      ${walletHtml}
       ${restOfOverviewHtml}
     </aside>
   `;
@@ -2574,6 +2622,15 @@ function handleAction(action) {
     complainJarOpen = !complainJarOpen;
     try {
       localStorage.setItem(COMPLAIN_JAR_OPEN_KEY, complainJarOpen ? "1" : "0");
+    } catch (error) {
+      console.error(error);
+    }
+    render();
+  }
+  if (action === "toggle-wallet-fold") {
+    walletOpen = !walletOpen;
+    try {
+      localStorage.setItem(WALLET_OPEN_KEY, walletOpen ? "1" : "0");
     } catch (error) {
       console.error(error);
     }
