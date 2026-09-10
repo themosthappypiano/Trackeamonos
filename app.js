@@ -2161,9 +2161,10 @@ function renderOverview(profile) {
         <button class="wallet-toggle" type="button" data-action="toggle-wallet-fold" aria-label="Toggle wallet">
           <span class="wallet-body">
             <span class="wallet-pouch"></span>
-            <span class="wallet-coin-peek">€</span>
             <span class="wallet-flap">
-              <span class="wallet-snap"></span>
+              <span class="wallet-rivet"></span>
+              <span class="wallet-pocket-seam"></span>
+              <span class="wallet-slot"></span>
             </span>
           </span>
           <span class="wallet-amount">€${walletTotal.toFixed(2)}</span>
@@ -2740,6 +2741,11 @@ async function hitLikeJar() {
       });
     } catch (error) {
       console.error("Failed to update Like Jar on Supabase:", error);
+      // Undo the optimistic update so the UI doesn't claim a click was saved
+      // when it wasn't — otherwise it silently reverts on the next reload.
+      state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, likeJarAmount: prevAmount, xpPenalty: profile.xpPenalty || 0 } : p);
+      notify("Couldn't save the Like Jar — check your connection and try again.");
+      render();
     }
   }
 }
@@ -2848,6 +2854,11 @@ async function hitComplainJar() {
       });
     } catch (error) {
       console.error("Failed to update Complaint Jar on Supabase:", error);
+      // Undo the optimistic update so the UI doesn't claim a click was saved
+      // when it wasn't — otherwise it silently reverts on the next reload.
+      state.profiles = state.profiles.map((p) => p.id === profile.id ? { ...p, complainJarAmount: prevAmount, xpPenalty: profile.xpPenalty || 0 } : p);
+      notify("Couldn't save the Complaint Jar — check your connection and try again.");
+      render();
     }
   }
 }

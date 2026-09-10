@@ -1904,8 +1904,8 @@ textarea {
 
 .wallet-body {
   position: relative;
-  width: 88px;
-  height: 60px;
+  width: 58px;
+  height: 72px;
   transition: transform 0.15s ease;
 }
 
@@ -1917,96 +1917,76 @@ textarea {
   transform: translateY(1px);
 }
 
-/* Cards peeking out of the top */
-.wallet-body::before,
-.wallet-body::after {
-  content: '';
+/* Back panel, peeking below the front pocket once it lifts open */
+.wallet-pouch {
   position: absolute;
-  top: -22px;
-  width: 30px;
-  height: 40px;
-  border-radius: 7px;
-  border: 2.5px solid rgba(0,0,0,0.12);
-  box-shadow: inset 0 2px 3px rgba(255,255,255,0.5), 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.wallet-body::before {
-  left: 8px;
-  background: linear-gradient(155deg, #8fd98f, #5cb85c 65%, #489c48);
-  transform: rotate(-14deg);
+  left: 2px;
+  right: 2px;
+  bottom: -4px;
+  height: 26px;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(180deg, #9c4c38, #7c3a29);
+  box-shadow: inset 0 -4px 6px rgba(0,0,0,0.2);
   z-index: 1;
 }
 
-.wallet-body::after {
-  left: 26px;
-  background: linear-gradient(155deg, #8fc7f2, #5a9fdb 65%, #4788c2);
-  transform: rotate(-4deg);
-  z-index: 2;
-}
-
-/* Back pouch, peeking below the front flap */
-.wallet-pouch {
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  bottom: -6px;
-  height: 22px;
-  border-radius: 0 0 16px 16px;
-  background: linear-gradient(180deg, #d9702f, #c8611f);
-  box-shadow: inset 0 -4px 6px rgba(0,0,0,0.15);
-  z-index: 3;
-}
-
-/* Coin peeking above the flap */
-.wallet-coin-peek {
-  position: absolute;
-  top: -10px;
-  right: 14px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff2b8, #f6c445 55%, #d99a1f 100%);
-  border: 2px solid #c9871a;
-  box-shadow: 0 2px 3px rgba(0,0,0,0.15);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #8a5a10;
-}
-
+/* Front leather pocket panel */
 .wallet-flap {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 52px;
-  border-radius: 18px 18px 20px 20px;
-  background: linear-gradient(155deg, #ff9a4d, #f2812f 55%, #de6f22);
-  box-shadow: inset 0 3px 5px rgba(255,255,255,0.45), inset 0 -6px 8px rgba(0,0,0,0.12), 0 4px 6px rgba(0,0,0,0.15);
+  inset: 0;
+  border-radius: 10px 10px 14px 14px;
+  background:
+    radial-gradient(ellipse at 30% 15%, rgba(255,255,255,0.18), rgba(255,255,255,0) 40%),
+    linear-gradient(160deg, #c97a5e, #b0623f 55%, #8f4630);
+  border: 2px dashed rgba(255, 244, 230, 0.75);
+  box-shadow: inset 0 0 0 5px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.18);
   transform-origin: top center;
   transform: perspective(220px) rotateX(0deg);
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease;
-  z-index: 5;
+  z-index: 2;
 }
 
 .wallet-card.open .wallet-flap {
   transform: perspective(220px) rotateX(-125deg);
-  box-shadow: inset 0 3px 5px rgba(255,255,255,0.45), 0 -3px 8px rgba(0,0,0,0.2);
+  box-shadow: inset 0 0 0 5px rgba(0,0,0,0.06), 0 -3px 8px rgba(0,0,0,0.2);
 }
 
-.wallet-snap {
+/* Rivet / snap button, top-left */
+.wallet-rivet {
   position: absolute;
-  right: 14px;
-  top: 20px;
-  width: 16px;
-  height: 16px;
+  left: 8px;
+  top: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #d7f0f7, #8ecbdb 60%, #5fa3b6 100%);
-  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.15), inset 0 1px 2px rgba(255,255,255,0.6), 0 1px 2px rgba(0,0,0,0.15);
-  z-index: 6;
+  background: radial-gradient(circle at 35% 30%, #fff9ee, #e8d3b8 65%, #c9a67d 100%);
+  border: 1px solid rgba(0,0,0,0.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  z-index: 3;
+}
+
+/* Curved stitched pocket seam */
+.wallet-pocket-seam {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  height: 60%;
+  border-radius: 50% 50% 8px 8px / 65% 65% 8px 8px;
+  border-top: 2px dashed rgba(255, 244, 230, 0.75);
+  z-index: 3;
+}
+
+/* Small diagonal card-slot accent, upper-left */
+.wallet-slot {
+  position: absolute;
+  left: 6px;
+  top: 30px;
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed rgba(255, 244, 230, 0.6);
+  transform: rotate(-32deg);
+  z-index: 3;
 }
 
 .wallet-amount {
