@@ -250,6 +250,9 @@ button {
   color: var(--ink);
   font-weight: 800;
   min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.14);
   transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
@@ -1533,6 +1536,7 @@ textarea {
   .check-item,
   .add-card,
   .add-card.two,
+  #task-form,
   #event-form {
     grid-template-columns: 1fr;
   }

@@ -3201,6 +3201,30 @@ async function deleteItem(kind, id) {
   if (!collectionName || !table) return;
   if (!(await styledConfirm("Delete this item? This can't be undone.", { title: "Delete item" }))) return;
 
+  // Remote delete FIRST (when the item is a real synced row). PostgREST/Supabase RLS
+  // silently returns 200/204 "success" for a DELETE whose USING clause matches zero
+  // rows (e.g. current_profile_id() didn't resolve for this session) — no error is
+  // thrown, but nothing was actually deleted server-side. Removing local state before
+  // confirming a row was really deleted made tasks "come back" after the next sync.
+  // Using return=representation lets us see the deleted row(s) and detect that no-op.
+  if (isUuid(id)) {
+    try {
+      const deletedRows = await supabaseRequest(table, {
+        method: "DELETE",
+        query: `?id=eq.${id}`,
+        prefer: "return=representation"
+      });
+      if (!deletedRows || deletedRows.length === 0) {
+        notify("Couldn't delete: item not found or you don't have permission.");
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      notify("Supabase delete failed.");
+      return;
+    }
+  }
+
   const deletedTask = kind === "tasks" ? state[collectionName].find((item) => item.id === id) : null;
   state[collectionName] = state[collectionName].filter((item) => item.id !== id);
   if (kind === "folders") {
@@ -3218,18 +3242,6 @@ async function deleteItem(kind, id) {
   saveState();
   render();
   notify("Item deleted.");
-
-  if (!isUuid(id)) return;
-  try {
-    await supabaseRequest(table, {
-      method: "DELETE",
-      query: `?id=eq.${id}`,
-      prefer: "return=minimal"
-    });
-  } catch (error) {
-    console.error(error);
-    notify("Supabase delete failed.");
-  }
 }
 
 async function deleteProfile(id) {
