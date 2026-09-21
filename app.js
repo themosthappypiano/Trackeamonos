@@ -1672,7 +1672,7 @@ function renderCalendarDayDetail(dateKey) {
       periodStatus = `<div class="period-late-status">🩸 Period was ${lateDays} day${lateDays === 1 ? "" : "s"} late</div>`;
     }
 
-    const buttonText = isPeriodDay ? "Unmark period day" : isPredicted ? "Estimated period day" : "Mark period day";
+    const buttonText = isPeriodDay ? "Period" : isPredicted ? "Period prediction" : "Mark period day";
     periodToggle = `
       <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
         ${isPeriodDay ? "🩸 " : ""}${buttonText}
