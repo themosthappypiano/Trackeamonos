@@ -787,20 +787,14 @@ textarea {
   box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.18);
 }
 
-.day-box.period {
-  border-color: var(--light-blue);
-  background: linear-gradient(135deg, var(--light-blue) 0%, var(--light-blue) 50%, var(--panel) 50%);
-}
-
+.day-box.period,
 .day-box.ovulation,
 .day-box.predicted-period {
   border-color: var(--light-blue);
 }
 
-.day-box.period .day-number {
-  position: relative;
-  z-index: 1;
-  color: var(--ink);
+.day-box.period {
+  background: rgba(188, 217, 251, 0.5);
 }
 
 .day-box.birthday {
@@ -873,24 +867,6 @@ textarea {
   background: var(--panel);
 }
 
-.period-prediction-status {
-  justify-self: start;
-  padding: 8px 12px;
-  border: 2px solid var(--light-blue);
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--blue);
-  background: var(--panel);
-}
-
-.period-mark-btn {
-  justify-self: start;
-  background: var(--panel);
-  color: var(--blue);
-  border-color: var(--light-blue);
-  font-weight: 600;
-}
 
 .calendar-day-detail,
 .calendar-upcoming {

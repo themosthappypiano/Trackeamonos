@@ -1664,27 +1664,20 @@ function renderCalendarDayDetail(dateKey) {
 
   let periodToggle = "";
   let periodStatus = "";
-  let markPeriodBox = "";
   if (canToggle) {
     const lateDays = calculatePeriodLateDays(activeProfile().id, dateKey);
     const isPredicted = getPredictedPeriodDates(activeProfile().id).includes(dateKey);
 
     if (isPeriodDay && lateDays > 0) {
       periodStatus = `<div class="period-late-status">🩸 Period was ${lateDays} day${lateDays === 1 ? "" : "s"} late</div>`;
-    } else if (!isPeriodDay && isPredicted) {
-      periodStatus = `<div class="period-prediction-status">📅 Period prediction</div>`;
-      markPeriodBox = `<button class="pill-button period-mark-btn" data-action="toggle-period-day">Mark period</button>`;
-    } else if (isPeriodDay) {
-      periodStatus = `<div class="period-status">🩸 Period</div>`;
     }
 
-    if (!markPeriodBox) {
-      periodToggle = `
-        <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
-          🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
-        </button>
-      `;
-    }
+    const buttonText = isPeriodDay ? "Unmark period day" : isPredicted ? "Estimated period day" : "Mark period day";
+    periodToggle = `
+      <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
+        ${isPeriodDay ? "🩸 " : ""}${buttonText}
+      </button>
+    `;
   } else if (sourceProfile && (isPeriodDay || isOvulationDay)) {
     periodToggle = `
       <div class="period-note">${isPeriodDay ? "🩸 Lua's period day" : "🥚 Lua's predicted ovulation day"}</div>
@@ -1698,7 +1691,6 @@ function renderCalendarDayDetail(dateKey) {
         ${eventsBlock}
         <div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>
         ${periodStatus}
-        ${markPeriodBox}
         ${periodToggle}
       </div>
     `;
@@ -1733,7 +1725,6 @@ function renderCalendarDayDetail(dateKey) {
       ${renderCalendarSection("🔁", "Habits", habitRows)}
       ${renderCalendarSection("✅", "Checklist", checklistRows)}
       ${periodStatus}
-      ${markPeriodBox}
       ${periodToggle}
     </div>
   `;
