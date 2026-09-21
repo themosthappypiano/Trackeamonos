@@ -881,6 +881,21 @@ function getPredictedOvulationDate(profileId) {
   return getPredictedOvulationDates(profileId)[0] || null;
 }
 
+// Gets the last expected period start date (the most recent one before or on today).
+function getLastExpectedPeriodStart(profileId) {
+  const starts = getPeriodStartDates(profileId);
+  if (!starts.length) return null;
+  return starts[starts.length - 1];
+}
+
+// Calculates how many days late a period is. Returns 0 if not late.
+function calculatePeriodLateDays(profileId, markedDateKey) {
+  const predictedDate = getPredictedPeriodDate(profileId);
+  if (!predictedDate) return 0;
+  const lateDays = dateKeyDiffDays(markedDateKey, predictedDate);
+  return Math.max(0, lateDays);
+}
+
 function setState(patch) {
   state = { ...state, ...patch };
   saveState();
@@ -1648,7 +1663,13 @@ function renderCalendarDayDetail(dateKey) {
   const eventsBlock = renderCalendarSection("🎉", "Events", eventRows);
 
   let periodToggle = "";
+  let latePeriodStatus = "";
   if (canToggle) {
+    const lateDays = calculatePeriodLateDays(activeProfile().id, dateKey);
+    const isPredicted = getPredictedPeriodDates(activeProfile().id).includes(dateKey);
+    if (isPeriodDay && lateDays > 0) {
+      latePeriodStatus = `<div class="period-late-status">🩸 Period was ${lateDays} day${lateDays === 1 ? "" : "s"} late</div>`;
+    }
     periodToggle = `
       <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
         🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
@@ -1666,6 +1687,7 @@ function renderCalendarDayDetail(dateKey) {
         <h4>${formatDateLabel(dateKey)}</h4>
         ${eventsBlock}
         <div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>
+        ${latePeriodStatus}
         ${periodToggle}
       </div>
     `;
@@ -1699,6 +1721,7 @@ function renderCalendarDayDetail(dateKey) {
       ${renderCalendarSection("📋", "Tasks", taskRows)}
       ${renderCalendarSection("🔁", "Habits", habitRows)}
       ${renderCalendarSection("✅", "Checklist", checklistRows)}
+      ${latePeriodStatus}
       ${periodToggle}
     </div>
   `;

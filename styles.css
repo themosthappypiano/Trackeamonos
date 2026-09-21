@@ -852,6 +852,17 @@ textarea {
   background: var(--panel);
 }
 
+.period-late-status {
+  justify-self: start;
+  padding: 8px 12px;
+  border: 2px solid var(--red);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  background: var(--panel);
+}
+
 .calendar-day-detail,
 .calendar-upcoming {
   display: grid;
