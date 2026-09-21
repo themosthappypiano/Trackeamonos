@@ -787,7 +787,11 @@ textarea {
   box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.18);
 }
 
-.day-box.period,
+.day-box.period {
+  border-color: var(--light-blue);
+  border-width: 3px;
+}
+
 .day-box.ovulation,
 .day-box.predicted-period {
   border-color: var(--light-blue);
@@ -860,6 +864,28 @@ textarea {
   font-size: 13px;
   font-weight: 600;
   color: var(--red);
+  background: var(--panel);
+}
+
+.period-estimated-status {
+  justify-self: start;
+  padding: 8px 12px;
+  border: 2px solid var(--light-blue);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--panel);
+}
+
+.period-status {
+  justify-self: start;
+  padding: 8px 12px;
+  border: 2px solid var(--pink);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pink);
   background: var(--panel);
 }
 

@@ -1663,13 +1663,19 @@ function renderCalendarDayDetail(dateKey) {
   const eventsBlock = renderCalendarSection("🎉", "Events", eventRows);
 
   let periodToggle = "";
-  let latePeriodStatus = "";
+  let periodStatus = "";
   if (canToggle) {
     const lateDays = calculatePeriodLateDays(activeProfile().id, dateKey);
     const isPredicted = getPredictedPeriodDates(activeProfile().id).includes(dateKey);
+
     if (isPeriodDay && lateDays > 0) {
-      latePeriodStatus = `<div class="period-late-status">🩸 Period was ${lateDays} day${lateDays === 1 ? "" : "s"} late</div>`;
+      periodStatus = `<div class="period-late-status">🩸 Period was ${lateDays} day${lateDays === 1 ? "" : "s"} late</div>`;
+    } else if (!isPeriodDay && isPredicted) {
+      periodStatus = `<div class="period-estimated-status">📅 Estimated period day</div>`;
+    } else if (isPeriodDay) {
+      periodStatus = `<div class="period-status">🩸 Period</div>`;
     }
+
     periodToggle = `
       <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
         🩸 ${isPeriodDay ? "Unmark period day" : "Mark period day"}
@@ -1687,7 +1693,7 @@ function renderCalendarDayDetail(dateKey) {
         <h4>${formatDateLabel(dateKey)}</h4>
         ${eventsBlock}
         <div class="empty">Nothing tracked on ${formatDateLabel(dateKey)}.</div>
-        ${latePeriodStatus}
+        ${periodStatus}
         ${periodToggle}
       </div>
     `;
@@ -1721,7 +1727,7 @@ function renderCalendarDayDetail(dateKey) {
       ${renderCalendarSection("📋", "Tasks", taskRows)}
       ${renderCalendarSection("🔁", "Habits", habitRows)}
       ${renderCalendarSection("✅", "Checklist", checklistRows)}
-      ${latePeriodStatus}
+      ${periodStatus}
       ${periodToggle}
     </div>
   `;
