@@ -787,11 +787,7 @@ textarea {
   box-shadow: 3px 3px 0 rgba(23, 33, 29, 0.18);
 }
 
-.day-box.period {
-  border-color: var(--light-blue);
-  background: rgba(188, 217, 251, 0.5);
-}
-
+.day-box.period,
 .day-box.ovulation,
 .day-box.predicted-period {
   border-color: var(--light-blue);
@@ -865,30 +861,6 @@ textarea {
   font-weight: 600;
   color: var(--red);
   background: var(--panel);
-}
-
-.period-buttons {
-  display: flex;
-  gap: 8px;
-  justify-self: start;
-}
-
-.period-estimated {
-  background: var(--panel);
-  color: var(--blue);
-  border-color: var(--light-blue);
-  cursor: default;
-  opacity: 0.7;
-}
-
-.period-estimated:hover {
-  opacity: 0.7;
-}
-
-.period-mark {
-  background: var(--panel);
-  color: var(--blue);
-  border-color: var(--light-blue);
 }
 
 
