@@ -1672,12 +1672,26 @@ function renderCalendarDayDetail(dateKey) {
       periodStatus = `<div class="period-late-status">🩸 Period was ${lateDays} day${lateDays === 1 ? "" : "s"} late</div>`;
     }
 
-    const buttonText = isPeriodDay ? "Period" : isPredicted ? "Estimated period day" : "Mark period day";
-    periodToggle = `
-      <button class="pill-button period-toggle${isPeriodDay ? " active" : ""}" data-action="toggle-period-day">
-        ${isPeriodDay ? "🩸 " : ""}${buttonText}
-      </button>
-    `;
+    if (isPeriodDay) {
+      periodToggle = `
+        <button class="pill-button period-toggle active" data-action="toggle-period-day">
+          🩸 Period
+        </button>
+      `;
+    } else if (isPredicted) {
+      periodToggle = `
+        <div class="period-buttons">
+          <button class="pill-button period-estimated" disabled>Estimated period day</button>
+          <button class="pill-button period-mark" data-action="toggle-period-day">Mark period</button>
+        </div>
+      `;
+    } else {
+      periodToggle = `
+        <button class="pill-button period-toggle" data-action="toggle-period-day">
+          Mark period day
+        </button>
+      `;
+    }
   } else if (sourceProfile && (isPeriodDay || isOvulationDay)) {
     periodToggle = `
       <div class="period-note">${isPeriodDay ? "🩸 Lua's period day" : "🥚 Lua's predicted ovulation day"}</div>
